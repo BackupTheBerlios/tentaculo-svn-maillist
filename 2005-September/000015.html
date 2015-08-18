@@ -1,0 +1,588 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r18 - trunk/elements
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-September/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r18%20-%20trunk/elements&In-Reply-To=%3C200509242312.j8ONCSK7008022%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000019.html">
+   <LINK REL="Next"  HREF="000016.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r18 - trunk/elements</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r18%20-%20trunk/elements&In-Reply-To=%3C200509242312.j8ONCSK7008022%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r18 - trunk/elements">dasenjo at berlios.de
+       </A><BR>
+    <I>Sun Sep 25 01:12:28 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000019.html">[Tentaculo-svn] r17 - in trunk: doc lib misc
+</A></li>
+        <LI>Next message: <A HREF="000016.html">[Tentaculo-svn] r19 - in trunk: . doc lib
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#15">[ date ]</a>
+              <a href="thread.html#15">[ thread ]</a>
+              <a href="subject.html#15">[ subject ]</a>
+              <a href="author.html#15">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-09-25 01:12:24 +0200 (Sun, 25 Sep 2005)
+New Revision: 18
+
+Removed:
+   trunk/elements/jsval.js
+   trunk/elements/validator.js
+Log:
+Javascript validation files that are not being used.
+
+
+
+Deleted: trunk/elements/jsval.js
+===================================================================
+--- trunk/elements/jsval.js	2005-09-24 21:57:04 UTC (rev 17)
++++ trunk/elements/jsval.js	2005-09-24 23:12:24 UTC (rev 18)
+@@ -1,437 +0,0 @@
+-/* FILE HEADER **************************************************
+-** JS Validate
+-** Author: Karl Seguin, Timo Haberkern
+-** Homepage: <A HREF="http://jsval.berlios.de/">http://jsval.berlios.de/</A>
+-** Version: 1.3.3
+-** Copyright 2003, 2005 Timo Haberkern, Karl Seguin
+-
+-    This file is part of JS Validate.
+-
+-    JS Validate is free software; you can redistribute it and/or modify
+-    it under the terms of the GNU Lesser General Public License as published by
+-    the Free Software Foundation; either version 2 of the License, or
+-    (at your option) any later version.
+-
+-    JS Validate is distributed in the hope that it will be useful,
+-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-    GNU General Public License for more details.
+-
+-    You should have received a copy of the GNU Lesser General Public License
+-    along with JS Validate; if not, write to the Free Software
+-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+-**
+-** END HEADER ***************************************************/
+-
+-function validateCompleteForm (objForm, strErrorClass) {
+-    return _validateInternal(objForm, strErrorClass, 0);
+-};
+-
+-function validateStandard (objForm, strErrorClass) {
+-    return _validateInternal(objForm, strErrorClass, 1);
+-};
+-
+-/***************************************************************
+-** Internal functions
+-*****************************************************************/
+-function _validateInternal(form, strErrorClass, nErrorThrowType){
+-   var strErrorMessage = &quot;&quot;; var objFirstError = null;
+-   if (nErrorThrowType == 0){
+-    strErrorMessage = (form.err) ? form.err : _getLanguageText(&quot;err_form&quot;);
+-   };
+-
+-   var fields = _GenerateFormFields(form);
+-   for (var i = 0; i &lt; fields.length; ++i){
+-      var field = fields[i];
+-      if (!field.IsValid(fields)){
+-        field.SetClass(strErrorClass);
+-        if (nErrorThrowType == 1) {
+-            _throwError(field);
+-            return false;
+-        }else{
+-            if (objFirstError == null){
+-               objFirstError = field;
+-            }
+-            strErrorMessage = _handleError (field, strErrorMessage);
+-            bError = true;
+-        }
+-      } else {
+-      	field.ResetClass();
+-      }
+-   };
+-   if (objFirstError != null) {
+-      alert(strErrorMessage);
+-      objFirstError.element.focus();
+-      return false;
+-  };
+-  return true;
+- };
+-
+- function _getLanguageText(id){
+-    objTextsInternal = new _jsVal_Language();
+-    objTexts = null;
+-    try {
+-        objTexts = new jsVal_Language();
+-    } catch (ignored){};
+-    switch (id) {
+-        case &quot;err_form&quot;: strResult = (!objTexts || !objTexts.err_form) ? objTextsInternal.err_form : objTexts.err_form; break;
+-        case &quot;err_enter&quot;: strResult = (!objTexts || !objTexts.err_enter) ? objTextsInternal.err_enter : objTexts.err_enter; break;
+-        case &quot;err_select&quot;: strResult = (!objTexts || !objTexts.err_select) ? objTextsInternal.err_select : objTexts.err_select; break;
+-    };
+-    return strResult;
+- };
+-
+- function _GenerateFormFields(form){
+-   var arr = new Array();
+-   for (var i = 0; i &lt; form.length; ++i){
+-      var element = form.elements[i];
+-      
+-      
+-      var index = _getElementIndex(arr,element);
+-      //if it doesn't already exist, add it to our array, else merge the change
+-      if (index == -1){
+-         arr[arr.length] = new Field(element, form);
+-      }else{
+-         arr[index].Merge(element)
+-      };
+-   };
+-   return arr;
+-};
+-
+-function _getElementIndex(arr, element){
+-   if (element.name) {
+-       var elementName = element.name.toLowerCase();
+-       for (var i = 0; i &lt; arr.length; ++i){
+-       	  if (arr[i].element.name) { 
+-			   if (arr[i].element.name.toLowerCase() == elementName){
+-               	  return i;
+-               }
+-          };
+-       };
+-   }
+-   return -1;
+-};
+-
+-/***************************************************************
+-** Standard translation
+-*****************************************************************/
+-function _jsVal_Language() {
+-    this.err_form = &quot;Please enter/select values for the following fields:\n\n&quot;;
+-    this.err_select = &quot;Please select a valid \&quot;%FIELDNAME%\&quot;&quot;;
+-    this.err_enter = &quot;Please enter a valid \&quot;%FIELDNAME%\&quot;&quot;;
+-};
+-
+-/***************************************************************
+-** Field Class
+-*****************************************************************/
+-function Field(element, form){
+-   this.type = element.type;
+-   this.element = element;
+-   this.exclude = element.exclude || element.getAttribute('exclude');
+-   this.err = element.err || element.getAttribute('err');
+-   this.required = _parseBoolean(element.required || element.getAttribute('required'));
+-   this.realname = element.realname || element.getAttribute('realname');
+-   this.elements = new Array();
+-   
+-   switch (this.type){
+-      case &quot;textarea&quot;:
+-      case &quot;password&quot;:
+-      case &quot;text&quot;:
+-      case &quot;file&quot;:
+-         this.value = element.value;
+-         this.minLength = element.minlength || element.getAttribute('minlength');
+-         this.maxLength = element.maxlength || element.getAttribute('maxlength');
+-         this.regexp = this._getRegEx(element);
+-         this.minValue = element.minvalue || element.getAttribute('minvalue');
+-         this.maxValue = element.maxvalue || element.getAttribute('maxvalue');
+-         this.equals = element.equals || element.getAttribute('equals');
+-         this.callback = element.callback || element.getAttribute('callback');
+-         break;
+-      case &quot;select-one&quot;:
+-      case &quot;select-multiple&quot;:
+-         this.values = new Array();
+-         for (var i = 0; i &lt; element.options.length; ++i){
+-            if (element.options[i].selected &amp;&amp; (!this.exclude || element.options[i].value != this.exclude)){
+-               this.values[this.values.length] = element.options[i].value;
+-            }
+-         }
+-         this.min = element.min || element.getAttribute('min');
+-         this.max = element.max || element.getAttribute('max');
+-         this.equals = element.equals || element.getAttribute('equals');
+-         break;
+-      case &quot;checkbox&quot;:
+-         this.min = element.min || element.getAttribute('min');
+-         this.max = element.max || element.getAttribute('max');
+-         //no break, let it fall through to radio
+-      case &quot;radio&quot;:
+-          this.required = _parseBoolean(this.required || element.getAttribute('required'));
+-          this.values = new Array();
+-          if (element.checked){
+-             this.values[0] = element.value;
+-          }
+-   		         
+-          this.elements[0] = element;
+-          break;
+-   };
+-};
+-Field.prototype.Merge = function(element){
+-   //never negate a require field
+-   var required = _parseBoolean(element.getAttribute('required'));
+-   if (required){
+-      this.required = true;
+-   };
+-   //all other cases (except required) we only add if there isn't already a value (first come first served)
+-   if (!this.err){
+-      this.err = element.getAttribute('err');
+-   };
+-   if (!this.equals){
+-   	  this.equals = element.getAttribute('equals');
+-   };
+-   if (!this.callback){
+-   	  this.callback = element.getAttribute('callback');
+-   };
+-   if (!this.realname){
+-      this.realname = element.getAttribute('realname');
+-   };
+-   if (!this.max){
+-      this.max = element.getAttribute('max');
+-   };
+-   if (!this.min){
+-      this.min = element.getAttribute('min');
+-   };
+-   if (!this.regexp){
+-      this.regexp = this._getRegEx(element);
+-   };
+-   if (element.checked){
+-      this.values[this.values.length] = element.value;
+-   };
+-   this.elements[this.elements.length] = element;
+-};
+-Field.prototype.IsValid = function(arrFields){
+-   switch (this.type){
+-      case &quot;textarea&quot;:
+-      case &quot;password&quot;:
+-      case &quot;text&quot;:
+-      case &quot;file&quot;:
+-         return this._ValidateText(arrFields);
+-      case &quot;select-one&quot;:
+-      case &quot;select-multiple&quot;:
+-      case &quot;radio&quot;:
+-      case &quot;checkbox&quot;:
+-         return this._ValidateGroup(arrFields);
+-      default:
+-         return true;
+-   };
+-};
+-Field.prototype.SetClass = function(newClassName){
+-   if ( (newClassName) &amp;&amp; (newClassName != &quot;&quot;) ) {
+-       if ( (this.elements) &amp;&amp; (this.elements.length &gt; 0)) {
+-          for (var i = 0; i &lt; this.elements.length; ++i){
+-          	  if(this.elements[i].className != newClassName){
+-                this.elements[i].oldClassName = this.elements[i].className;
+-                this.elements[i].className = newClassName;
+-              }
+-          }
+-       }else{
+-       	  if(this.element.className != newClassName){
+-            this.element.oldClassName = this.element.className;
+-            this.element.className = newClassName;
+-          }
+-       };
+-   }
+-};
+-Field.prototype.ResetClass = function(){
+-	if ( (this.type != &quot;button&quot;) &amp;&amp; (this.type != &quot;submit&quot;) &amp;&amp; (this.type != &quot;reset&quot;) ) {
+-   		if ( (this.elements) &amp;&amp; (this.elements.length &gt; 0)) {
+-      		for (var i = 0; i &lt; this.elements.length; ++i){
+-      			if(this.elements[i].oldClassName){
+-         	 	  this.elements[i].className = this.elements[i].oldClassName;
+-         	 	}
+-         	 	else {
+-    	  	 	  this.element.className = &quot;&quot;;
+-    	  		}
+-      		}
+-   		}else{
+-   			if(this.elements.oldClassName){
+-    	  	  this.element.className = this.element.oldClassName;
+-    	  	}
+-    	  	else {
+-    	  	  this.element.className = &quot;&quot;;
+-    	  	}
+-   		};
+-	};
+-};
+-Field.prototype._getRegEx = function(element){
+-   regex = element.regexp || element.getAttribute('regexp')
+-   if (regex == null) return null;
+-   retype = typeof(regex);
+-   if (retype.toUpperCase() == &quot;FUNCTION&quot;)
+-       return regex;
+-   else if ( (retype.toUpperCase() == &quot;STRING&quot;) &amp;&amp; !(regex == &quot;JSVAL_RX_EMAIL&quot;) &amp;&amp; !(regex == &quot;JSVAL_RX_TEL&quot;)
+-   				&amp;&amp; !(regex == &quot;JSVAL_RX_PC&quot;) &amp;&amp; !(regex == &quot;JSVAL_RX_ZIP&quot;) &amp;&amp; !(regex == &quot;JSVAL_RX_MONEY&quot;) 
+-				&amp;&amp; !(regex == &quot;JSVAL_RX_CREDITCARD&quot;) &amp;&amp; !(regex == &quot;JSVAL_RX_POSTALZIP&quot;))
+-   {
+-       nBegin = 0; nEnd = regex.length-1;
+-       if (regex.charAt(0) == &quot;/&quot;) nBegin=1;
+-       if (regex.charAt(regex.length-1) == &quot;/&quot;) nEnd=regex.length-2;
+-	   
+-       return new RegExp(regex.slice(nBegin, nEnd));
+-   }
+-   else {
+-       return regex;
+-   };
+-};
+-Field.prototype._ValidateText = function(arrFields){
+-   if ( (this.required) &amp;&amp; (this.callback) ) {
+-   	  nCurId = this.element.id ? this.element.id : &quot;&quot;;
+-   	  nCurName = this.element.name ? this.element.name : &quot;&quot;;
+-   	  
+-   	  eval(&quot;bResult = &quot;+this.callback+&quot;('&quot;+nCurId+&quot;', '&quot;+nCurName+&quot;', '&quot;+this.value+&quot;');&quot;); 
+-   	  if (bResult == false) {
+-   	  	 return false;
+-   	  };
+-   } else {	
+-	   //required value is empty
+-	   if (this.required &amp;&amp; !this.value){
+-	      return false;
+-	   };
+-	   //value less than minlength
+-	   if (this.value &amp;&amp; (this.minLength &amp;&amp; this.value.length &lt; this.minLength)){
+-	      return false;
+-	   };
+-	   //value is more than maxlength
+-	   if (this.value &amp;&amp; (this.maxLength &amp;&amp; this.value.length &gt; this.maxLength)){
+-	      return false;
+-	   };
+-	   //value fails regular expression
+-	   if (this.regexp){
+-	   	  if (!_checkRegExp(this.regexp, this.value))
+-	   	  {
+-	   	  	  //the field isn't required, but there is a value
+-		      if (!this.required &amp;&amp; this.value){
+-		         return false;
+-		      }
+-		      if (this.required){
+-		         return false;
+-		      }
+-	   	  }
+-	   	  else
+-	   	  {
+-	   	  	return true;
+-	   	  };
+-	   };
+-	   
+-	   
+-	   
+-	   //check equality
+-	   if (this.equals){
+-	   	   for (var i = 0; i &lt; arrFields.length; ++i){
+-	       	   var field = arrFields[i];
+-	       	   if ( (field.element.name == this.equals) || (field.element.id == this.equals) ) {
+-	       	   	  if (field.element.value != this.value) {
+-	       	   	  	 return false;
+-	       	   	  };
+-	       	   	  break;
+-	       	   };
+-	       };
+-	   };
+-	   
+-	   //check against minvalue and maxvalue
+-	   if (this.required){
+-	      var fValue = parseFloat(this.value);
+-	      if ((this.minValue || this.maxValue) &amp;&amp; isNaN(fValue)){
+-	         return false;
+-	      };
+-	      if ( (this.minValue) &amp;&amp; (fValue &lt; this.minValue) ) {
+-	         return false;
+-	      };
+-	      if ( (this.maxValue) &amp;&amp; (fValue &gt; this.maxValue) ) {
+-	         return false
+-	      };
+-	   };
+-   }
+-   return true;
+-};
+-Field.prototype._ValidateGroup = function(arrFields){
+-   if (this.required &amp;&amp; this.values.length == 0){
+-      return false;
+-   };
+-   if (this.required &amp;&amp; this.min &amp;&amp; this.min &gt; this.values.length){
+-      return false;
+-   };
+-   if (this.required &amp;&amp; this.max &amp;&amp; this.max &lt; this.values.length){
+-      return false;
+-   };
+-   return true;
+-};
+-
+-function _handleError (field, strErrorMessage) {
+-   var obj = field.element;
+-   strNewMessage = strErrorMessage + ( (field.realname)? field.realname : ((obj.id) ? obj.id : obj.name) ) + &quot;\n&quot;;
+-   return strNewMessage;
+-};
+-
+-function _throwError(field){
+-   var obj = field.element;
+-   switch (field.type){
+-      case &quot;text&quot;:
+-      case &quot;password&quot;:
+-      case &quot;textarea&quot;:
+-      case &quot;file&quot;:
+-         alert(_getError(field, &quot;err_enter&quot;));
+-         try {
+-         	obj.focus();
+-         }
+-         catch (ignore) {}
+-         break;
+-      case &quot;select-one&quot;:
+-      case &quot;select-multiple&quot;:
+-      case &quot;radio&quot;:
+-      case &quot;checkbox&quot;:
+-         alert(_getError(field, &quot;err_select&quot;));
+-         break;
+-      };
+-};
+-
+-function _getError(field, str){
+-   var obj = field.element;
+-   strErrorTemp = (field.err) ? field.err : _getLanguageText(str);
+-   
+-   idx = strErrorTemp.indexOf( &quot;\\n&quot; );
+-   while ( idx &gt; -1 ) {
+-   	strErrorTemp = strErrorTemp.replace( &quot;\\n&quot;, &quot;\n&quot; );
+-    idx = strErrorTemp.indexOf( &quot;\\n&quot; );
+-   };
+-   
+-   return strErrorTemp.replace(&quot;%FIELDNAME%&quot;, (field.realname)? field.realname : ((obj.id) ? obj.id : obj.name));
+-};
+-
+-function _parseBoolean(value){
+-   return !(!value || value == 0 || value == &quot;0&quot; || value == &quot;false&quot;);
+-};
+-
+-function _checkRegExp(regx, value){
+-  switch (regx){
+-  case &quot;JSVAL_RX_EMAIL&quot;:
+-    return ((/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,5})+$/).test(value));
+-  case &quot;JSVAL_RX_TEL&quot;:
+-    return ((/^1?[\- ]?\(?\d{3}\)?[\- ]?\d{3}[\- ]?\d{4}$/).test(value));
+-  case &quot;JSVAL_RX_PC&quot;:
+-    return ((/^[a-z]\d[a-z] ?\d[a-z]\d$/i).test(value));
+-  case &quot;JSVAL_RX_ZIP&quot;:
+-    return ((/^\d{5}$/).test(value));
+-  case &quot;JSVAL_RX_MONEY&quot;:
+-    return ((/^\d+([\.]\d\d)?$/).test(value));
+-  case &quot;JSVAL_RX_CREDITCARD&quot;:
+-    return (!isNaN(value));
+-  case &quot;JSVAL_RX_POSTALZIP&quot;:
+-    if(value.length == 6 || value.length == 7)
+-      return((/^[a-zA-Z]\d[a-zA-Z] ?\d[a-zA-Z]\d$/).test(value));
+-    if(value.length == 5 || value.length == 10)
+-      return((/^\d{5}(\-\d{4})?$/).test(value));
+-    break;
+-  default:
+-    return (regx.test(value));
+-
+-  };
+-};
+\ No newline at end of file
+
+Deleted: trunk/elements/validator.js
+===================================================================
+--- trunk/elements/validator.js	2005-09-24 21:57:04 UTC (rev 17)
++++ trunk/elements/validator.js	2005-09-24 23:12:24 UTC (rev 18)
+@@ -1,64 +0,0 @@
+-    // Validator Object
+-    var valid = new Object();
+-
+-    // REGEX Elements
+-
+-        // matches zip codes
+-        valid.zipCode = /\d{5}(-\d{4})?/;
+-
+-        // matches $17.23 or $14,281,545.45 or ...
+-        valid.Currency = /\$\d{1,3}(,\d{3})*\.\d{2}/;
+-
+-        // matches 5:04 or 12:34 but not 75:83
+-        valid.Time = /^([1-9]|1[0-2]):[0-5]\d$/;
+-
+-        //matches email
+-        valid.emailAddress = /^.+\@(\[?)[a-zA-Z0-9\-\.]+\.([a-zA-Z]{2,3}|[0-9]{1,3})(\]?)$/;
+-
+-        // matches phone ###-###-####
+-        valid.phoneNumber = /^\(?\d{3}\)?\s|-\d{3}-\d{4}$/;
+-
+-        // International Phone Number
+-        valid.phoneNumberInternational = /^\d(\d|-){7,20}/;
+-
+-        // IP Address
+-        valid.ipAddress = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/;
+-
+-        // Date xx/xx/xxxx
+-        valid.Date = /^\d{1,2}(\-|\/|\.)\d{1,2}\1\d{4}$/;
+-
+-        // State Abbreviation
+-        valid.State = /^(AK|AL|AR|AZ|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NB|NC|ND|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)$/i;
+-
+-        // Social Security Number
+-        valid.SSN = /^\d{3}\-\d{2}\-\d{4}$/;
+-
+-    
+-    function validateForm(theForm) {
+-
+-        var elArr = theForm.elements; 
+-
+-        for(var i = 0; i &lt; elArr.length; i++) {
+-
+-           with(elArr[i]) { 
+-
+-              var v = elArr[i].validator; 
+-
+-              if(!v) continue; 
+-
+-              var thePat = valid[v]; 
+-
+-              var gotIt = thePat.exec(value); 
+-
+-              if(! gotIt){
+-                 alert(name + &quot;: failure to match &quot; + v + &quot; to &quot; + value);                  
+-                 elArr[i].select();
+-                 elArr[i].focus(); 
+-                 return false;
+-              }
+-           }
+-        }
+-
+-        return true;
+-
+-    }
+\ No newline at end of file
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000019.html">[Tentaculo-svn] r17 - in trunk: doc lib misc
+</A></li>
+	<LI>Next message: <A HREF="000016.html">[Tentaculo-svn] r19 - in trunk: . doc lib
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#15">[ date ]</a>
+              <a href="thread.html#15">[ thread ]</a>
+              <a href="subject.html#15">[ subject ]</a>
+              <a href="author.html#15">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

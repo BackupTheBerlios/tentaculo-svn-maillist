@@ -1,0 +1,1794 @@
+From dasenjo at berlios.de  Mon Oct  3 21:41:41 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Mon, 3 Oct 2005 21:41:41 +0200
+Subject: [Tentaculo-svn] r22 - in trunk: . lib templates/es
+Message-ID: <200510031941.j93JffTc021795@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-03 21:41:40 +0200 (Mon, 03 Oct 2005)
+New Revision: 22
+
+Modified:
+   trunk/index.pl
+   trunk/lib/SessionControl.pm
+   trunk/lib/Status.pm
+   trunk/sec.pl
+   trunk/templates/es/status.html
+Log:
+Squid interaction complete including all the interface items.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-29 23:22:27 UTC (rev 21)
++++ trunk/index.pl	2005-10-03 19:41:40 UTC (rev 22)
+@@ -56,11 +56,10 @@
+ 	if ( $sect eq 'status' ) {
+ 		#-- Status section --#
+ 		if(!$act){
+-			my $s = $sc->param("status");
+-			my $r = $sc->param("restart");
++			my ($s, $r) = ($sc->param("status"), $sc->param("restart"));
+ 			print $cgi->redirect("sec.pl?act=status") unless $s;
+ 			$c = $stat->load($c, $s, $r) if $s;
+-			$sc->clear(["status"]); # clear session params 
++			$sc->clear(["status"])
+ 		} elsif( $act eq 'restart'){
+ 			print $cgi->redirect("sec.pl?act=restart");
+ 		}
+
+Modified: trunk/lib/SessionControl.pm
+===================================================================
+--- trunk/lib/SessionControl.pm	2005-09-29 23:22:27 UTC (rev 21)
++++ trunk/lib/SessionControl.pm	2005-10-03 19:41:40 UTC (rev 22)
+@@ -37,6 +37,13 @@
+ 	return $self->{session}->clear($variable);
+ }
+ 
++sub expires{
++	my $self = shift;
++	my $variable = shift;
++	my $time = shift;
++	return $self->{session}->expires($variable,$time);
++}
++
+ sub check{
+ 	my $self = shift;
+ 	my $ph = shift;
+
+Modified: trunk/lib/Status.pm
+===================================================================
+--- trunk/lib/Status.pm	2005-09-29 23:22:27 UTC (rev 21)
++++ trunk/lib/Status.pm	2005-10-03 19:41:40 UTC (rev 22)
+@@ -15,13 +15,18 @@
+ 	shift;
+ 	my ($c, $s, $r) = @_;
+ 
+-	my $sys = $s->{sys} ? _("controlling squid") : _("not controlling squid");
+-	$c =~ s/<!-- SYS-STATUS -->/$sys/;
++	my $sys = _("Not applied changes. Restart squid and apply the changes.") if $s->{cha} == 1;
++	$c =~ s/<!-- CHANGES -->/$sys/ if $sys;
+ 
+ 	my $squ = $s->{squ} ? _("running") : _("stopped");
+ 	$c =~ s/<!-- SQ-STATUS -->/$squ/;
+ 	
+-	$c =~ s/<!-- RESTART -->/$r/ if $r;
++	if($r){
++		my $title = "<h2>"._("Squid restart results")."</h2>";
++		$c =~ s/<!-- RES-TITLE -->/$title/;
++		$c =~ s/<!-- RES-FILE -->/$r->{file}/ if $r->{file};
++		$c =~ s/<!-- RES-ACT -->/$r->{act}/ if $r->{act};
++	}
+ 
+ 	return $c;
+ }
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-09-29 23:22:27 UTC (rev 21)
++++ trunk/sec.pl	2005-10-03 19:41:40 UTC (rev 22)
+@@ -11,11 +11,15 @@
+ use POSIX;
+ use SessionControl;
+ use Logger;
++use I18N; 
+ 
++# Squid vars
++my $scf = "/etc/squid/squid.conf";
++my $sqb = "/usr/sbin/squid";
++
+ my $cgi = new CGI;
+ my $sc = SessionControl->new($cgi);
+ $sc->startSession();		# Start a new session or recover an started one.
+-my $scf = "/etc/squid/squid.conf";
+ 
+ if ( $sc->isLoggedIn() ){
+ 	my $uid = POSIX::getuid();
+@@ -23,25 +27,50 @@
+ 	my $stat = $sc->param('status');
+ 
+ 	if($act && $act eq 'status'){
+-		my $s = { sys => 0, squ => 0};
++		my $s = { cha => 0, squ => 0};
+ 		&getRoot() or Logger->error("Can't get root privileges");
++
+ 		# Compare the files to check if the system is controlling squid.
+-		$s->{sys} = 1 unless `diff etc/squid.conf $scf`;
++		my $diff = `diff etc/squid.conf $scf`;
++		if($diff eq '' && $? == 0){ $s->{cha} = 0; } 
++		else { $s->{cha} = 1; }
++
+ 		# Is squid running?
+ 		$s->{squ} = 1 if `pgrep squid`;
+-		&holdRoot($uid) or die "Can't hold root privilegs";
++
++		&holdRoot($uid) or die "Can't hold root privileges";
++		Logger->message("System status: cha=$s->{cha}, squ=$s->{squ}");
+ 		$sc->param('status', $s);
+ 	} elsif($act && $act eq 'restart') {
++		my $res = { file => '', act => ''};
+ 		&getRoot() or Logger->error("Can't get root privileges");
+ 		# Make a backup the first time.
+ 		`cp $scf $scf.tent` if (-e $scf && !-e $scf."tent");
++
+ 		# An easy way: copy the configuration file and reload/start squid.
+-		my $res = `cp -v etc/squid.conf $scf;`;
+-		if ($stat && $stat->{squ}){ $res .= `squid -k reconfigure`; } # running, just reload
+-		else {  $res .= `/etc/init.d/squid start`; }
++		`cp -v etc/squid.conf $scf`;
++		if ($? == 0){ $res->{file} .= _("Squid configuration file copied succesfully."); }
++		else { $res->file .= _("There was errors copying the squid configration file: $!"); }
++
++		# If squid is running, reconfigure it.
++		if ($stat && $stat->{squ}){ 
++			my $rec = `$sqb -k reconfigure`; 
++			if ($? == 0){ $res->{act} .= _("Configuration reloaded succesfully. ");  } 
++			else { $res->{act} .= _("Error reloading the configuration: $!. "); }
++			$res->{act} .= _("Command output:").$rec."\n" if $rec;
++		}
++
++		# If squid is stopped, start it.
++		else {  
++			my $rec .= `/etc/init.d/squid start`; 
++			if ($? == 0){ $res->{act} .= _("Squid started succesfully. ");  } 
++			else { $res->{act} .= _("Error starting squid: $!. ");  }
++			$res->{act} .= _("Command output").": $rec" if $rec;
++		}
++
+ 		&holdRoot($uid) or die "Can't hold root privileges";
+-		Logger->message("Restarting squid result: $res");
+ 		$sc->param('restart', $res);
++		$sc->expires('restart', '+5s');
+ 	}
+ } else {
+ 	# An error. This script should not be called without being logged in.
+@@ -51,7 +80,6 @@
+ print $cgi->redirect("index.pl");
+ 
+ sub getRoot{
+-	shift;
+ 	POSIX::setuid(0) or Logger->message($!);
+ 	delete @ENV{qw(IFS PATH CDPATH ENV BASH_ENV)};   # Make %ENV safer
+ 	return 1 if POSIX::getuid() == 0;
+@@ -59,7 +87,6 @@
+ }
+ 
+ sub holdRoot{
+-	shift;
+ 	my $uid = shift;
+ 	POSIX::setuid($uid);
+ 	return 1 if POSIX::getuid() == $uid;
+
+Modified: trunk/templates/es/status.html
+===================================================================
+--- trunk/templates/es/status.html	2005-09-29 23:22:27 UTC (rev 21)
++++ trunk/templates/es/status.html	2005-10-03 19:41:40 UTC (rev 22)
+@@ -1,6 +1,8 @@
+ <h1>Inicio</h1>
+ 					<p>Bienvenido al Sistema de Navegaci?n Controlada.</p>
+-					<p>El sistema est? <!-- SYS-STATUS -->.</p>
++					<p><!-- CHANGES --></p>
+ 					<p>Squid est? <!-- SQ-STATUS -->.</p>
+ 					<p><a href=index.pl?sect=status&act=restart>Restart squid and aply the changes</a></p>
+-					<p><!-- RESTART --></p>
++					<!-- RES-TITLE -->
++					<p><!-- RES-FILE --></p>
++					<p><!-- RES-ACT --></p>
+
+
+
+From dasenjo at berlios.de  Mon Oct  3 23:31:14 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Mon, 3 Oct 2005 23:31:14 +0200
+Subject: [Tentaculo-svn] r23 - in trunk: . lib misc templates/es
+Message-ID: <200510032131.j93LVEpJ000135@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-03 23:31:13 +0200 (Mon, 03 Oct 2005)
+New Revision: 23
+
+Modified:
+   trunk/lib/Cache.pm
+   trunk/lib/Cache_Dir.pm
+   trunk/lib/General.pm
+   trunk/lib/Status.pm
+   trunk/misc/tentaculo.sql
+   trunk/sec.pl
+   trunk/templates/es/cache_table.html
+   trunk/templates/es/status.html
+Log:
+Added support to create the swap directories by running squid -z.
+
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-10-03 19:41:40 UTC (rev 22)
++++ trunk/lib/Cache.pm	2005-10-03 21:31:13 UTC (rev 23)
+@@ -17,21 +17,25 @@
+ 
+ sub load{
+ 	shift;
+-	my ($c,$tags) = @_;
++	my ($c, $tags) = @_;
+ 	my $mem = General->getCacheMem;
+ 	my $cda = Cache_Dir->getAll;
++
+ 	$c =~ s/name="cMem"/name="cMem" value="$mem"/ if $mem;
++
+ 	if ($cda){
+ 		my $dirs;
+ 		my ($table, $row) = (Template->read('cache_table'), Template->read('cache_row'));
+ 		foreach my $dir (@{$cda}){ $dirs .= &loadCacheRow($row, $dir); }
+ 		$table =~ s/<!-- CACHE_DIRS -->/$dirs/;
++		$table =~ s/<!-- SWAP -->/Create swap directories/ unless General->isSwapCreated();
+ 		$c =~ s/<!-- DIRS_TABLE -->/$table/;
+ 	} else {
+ 		my $no_dir = "<p>"._("There are not cache directories configured.")."</p>";
+ 		$no_dir .= '<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">'._("Agregar nuevo directorio de Cache").'</a></p></div>';
+ 		$c =~ s/<!-- DIRS_TABLE -->/$no_dir/;
+ 	}
++
+ 	if($tags){
+ 		foreach (@{$tags}){
+ 			$c =~ s/for="cMem"/class="invalid" for="cMem"/ if $_ eq 'cMem';	
+@@ -160,7 +164,7 @@
+ 
+ sub result{
+ 	shift;
+-	my ($r, $sub) = @_;
++	my $r = @_;
+ 	my ($t, $m);
+ 	my $res = Template->read('result');
+ 	if ($r){ 
+@@ -176,5 +180,14 @@
+ 	return $res;
+ }
+ 
++sub swap{
++	shift;
++	my $swap = @_;
++	my $res = Template->read('result');
++	$res =~ s/<!-- TITLE -->/$swap/;
++	$res =~ s/SECTION/cache/g;
++	return $res;
++}
+ 
++
+ 1;
+
+Modified: trunk/lib/Cache_Dir.pm
+===================================================================
+--- trunk/lib/Cache_Dir.pm	2005-10-03 19:41:40 UTC (rev 22)
++++ trunk/lib/Cache_Dir.pm	2005-10-03 21:31:13 UTC (rev 23)
+@@ -30,23 +30,25 @@
+ 	my $cd = Cache_Dir->retrieve($ph->{cID});
+ 	$cd->directory($ph->{cDir}) if $cd;
+ 	$cd->size($ph->{cSize}) if $cd;
+-	return $cd->update if ($cd && General->isChanged(1));
++	return $cd->update if ($cd && General->isChanged(1) && !General->isSwapCreated(0));
+ 	return 0;
+ }
+ 
+ sub addCachedir{
+ 	shift;
+ 	my $ph = shift;
+-	return Cache_Dir->create({
++	my $cd = Cache_Dir->create({
+ 		directory => $ph->{cDir},
+ 		size => $ph->{cSize},
+ 	});
++	return $cd if ($cd && General->isChanged(1) && !General->isSwapCreated(0));
++	return 0;
+ }
+ 
+ sub delCachedir{
+ 	shift;
+ 	my $d = Cache_Dir->retrieve(shift);
+-	return $d->delete() if $d;
++	return $d->delete() if ($d && General->isChanged(1) && !General->isSwapCreated(0));
+ 	return 0;
+ }
+ 
+
+Modified: trunk/lib/General.pm
+===================================================================
+--- trunk/lib/General.pm	2005-10-03 19:41:40 UTC (rev 22)
++++ trunk/lib/General.pm	2005-10-03 21:31:13 UTC (rev 23)
+@@ -7,7 +7,7 @@
+ use Data::Types qw(:int);
+ 
+ General->table('general');
+-General->columns(All => qw/id enable changed http_port visible_hostname append_domain icp_port cache_mem/);
++General->columns(All => qw/id enable changed swap http_port visible_hostname append_domain icp_port cache_mem/);
+ 
+ sub new{
+ 	my $this = shift;
+@@ -105,6 +105,18 @@
+ 	return $g->changed();
+ }
+ 
++sub isSwapCreated{
++	shift;
++	my $var;
++	$var = shift if @_;		# method called with a param.		
++	my $g = General->retrieve(1);
++	if (defined($var) && ($var == 1 || $var == 0)){
++		$g->swap($var);
++		$g->update;
++	} 
++	return $g->swap();
++}
++
+ sub load{
+ 	shift;
+ 	my ($c,$tags) = @_;
+
+Modified: trunk/lib/Status.pm
+===================================================================
+--- trunk/lib/Status.pm	2005-10-03 19:41:40 UTC (rev 22)
++++ trunk/lib/Status.pm	2005-10-03 21:31:13 UTC (rev 23)
+@@ -2,6 +2,7 @@
+ 
+ use strict;
+ use Logger;
++use General;
+ 
+ sub new{
+ 	my $this = shift;
+@@ -21,6 +22,9 @@
+ 	my $squ = $s->{squ} ? _("running") : _("stopped");
+ 	$c =~ s/<!-- SQ-STATUS -->/$squ/;
+ 	
++	my $swap = "NO" unless General->isSwapCreated();
++	$c =~ s/<!-- SWAP -->/$swap/ if $swap;
++	
+ 	if($r){
+ 		my $title = "<h2>"._("Squid restart results")."</h2>";
+ 		$c =~ s/<!-- RES-TITLE -->/$title/;
+
+Modified: trunk/misc/tentaculo.sql
+===================================================================
+--- trunk/misc/tentaculo.sql	2005-10-03 19:41:40 UTC (rev 22)
++++ trunk/misc/tentaculo.sql	2005-10-03 21:31:13 UTC (rev 23)
+@@ -27,11 +27,6 @@
+   PRIMARY KEY  (id)
+ ) AUTO_INCREMENT=1 ;
+ 
+--- 
+--- Volcar la base de datos para la tabla `acl`
+--- 
+-
+-
+ -- --------------------------------------------------------
+ 
+ -- 
+@@ -46,7 +41,7 @@
+ ) AUTO_INCREMENT=2 ;
+ 
+ -- 
+--- Volcar la base de datos para la tabla `admin`
++-- Data for table `admin`
+ -- 
+ 
+ INSERT INTO admin VALUES (1, 'admin', '4d186321c1a7f0f354b297e8914ab240');
+@@ -64,11 +59,6 @@
+   PRIMARY KEY  (id)
+ ) AUTO_INCREMENT=1 ;
+ 
+--- 
+--- Volcar la base de datos para la tabla `cache_dir`
+--- 
+-
+-
+ -- --------------------------------------------------------
+ 
+ -- 
+@@ -83,11 +73,6 @@
+   PRIMARY KEY  (id)
+ ) AUTO_INCREMENT=1 ;
+ 
+--- 
+--- Volcar la base de datos para la tabla `cache_peer`
+--- 
+-
+-
+ -- --------------------------------------------------------
+ 
+ -- 
+@@ -101,11 +86,6 @@
+   delay_pool_id int(10) unsigned default NULL
+ ) TYPE=MyISAM;
+ 
+--- 
+--- Volcar la base de datos para la tabla `delay_access`
+--- 
+-
+-
+ -- --------------------------------------------------------
+ 
+ -- 
+@@ -119,11 +99,6 @@
+   PRIMARY KEY  (id)
+ ) AUTO_INCREMENT=1 ;
+ 
+--- 
+--- Volcar la base de datos para la tabla `delay_pool`
+--- 
+-
+-
+ -- --------------------------------------------------------
+ 
+ -- 
+@@ -134,6 +109,7 @@
+   id int(11) NOT NULL default '1',
+   enable tinyint(1) NOT NULL default '0',
+   changed tinyint(1) NOT NULL default '0',
++  swap tinyint(1) NOT NULL default '0',
+   http_port smallint(5) unsigned NOT NULL default '3128',
+   icp_port smallint(5) unsigned NOT NULL default '3130',
+   visible_hostname varchar(255) default NULL,
+@@ -143,7 +119,7 @@
+ ) TYPE=MyISAM;
+ 
+ -- 
+--- Volcar la base de datos para la tabla `general`
++-- Data for table `general`
+ -- 
+ 
+-INSERT INTO general VALUES (1, 0, 0, 3128, 3130, NULL, NULL, '8M');
++INSERT INTO general VALUES (1, 0, 0, 0, 3128, 3130, NULL, NULL, '8M');
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-10-03 19:41:40 UTC (rev 22)
++++ trunk/sec.pl	2005-10-03 21:31:13 UTC (rev 23)
+@@ -12,10 +12,12 @@
+ use SessionControl;
+ use Logger;
+ use I18N; 
++use General;
+ 
+ # Squid vars
+-my $scf = "/etc/squid/squid.conf";
+-my $sqb = "/usr/sbin/squid";
++my $squ_cfg = "/etc/squid/squid.conf";
++my $squ_bin = "/usr/sbin/squid";
++my $squ_user = "proxy";
+ 
+ my $cgi = new CGI;
+ my $sc = SessionControl->new($cgi);
+@@ -31,7 +33,7 @@
+ 		&getRoot() or Logger->error("Can't get root privileges");
+ 
+ 		# Compare the files to check if the system is controlling squid.
+-		my $diff = `diff etc/squid.conf $scf`;
++		my $diff = `diff etc/squid.conf $squ_cfg`;
+ 		if($diff eq '' && $? == 0){ $s->{cha} = 0; } 
+ 		else { $s->{cha} = 1; }
+ 
+@@ -45,16 +47,16 @@
+ 		my $res = { file => '', act => ''};
+ 		&getRoot() or Logger->error("Can't get root privileges");
+ 		# Make a backup the first time.
+-		`cp $scf $scf.tent` if (-e $scf && !-e $scf."tent");
++		`cp $squ_cfg $squ_cfg.tent` if (-e $squ_cfg && !-e $squ_cfg."tent");
+ 
+ 		# An easy way: copy the configuration file and reload/start squid.
+-		`cp -v etc/squid.conf $scf`;
++		`cp -v etc/squid.conf $squ_cfg`;
+ 		if ($? == 0){ $res->{file} .= _("Squid configuration file copied succesfully."); }
+ 		else { $res->file .= _("There was errors copying the squid configration file: $!"); }
+ 
+ 		# If squid is running, reconfigure it.
+ 		if ($stat && $stat->{squ}){ 
+-			my $rec = `$sqb -k reconfigure`; 
++			my $rec = `$squ_bin -k reconfigure`; 
+ 			if ($? == 0){ $res->{act} .= _("Configuration reloaded succesfully. ");  } 
+ 			else { $res->{act} .= _("Error reloading the configuration: $!. "); }
+ 			$res->{act} .= _("Command output:").$rec."\n" if $rec;
+@@ -71,6 +73,15 @@
+ 		&holdRoot($uid) or die "Can't hold root privileges";
+ 		$sc->param('restart', $res);
+ 		$sc->expires('restart', '+5s');
++	} elsif($act && $act eq 'swap') {
++		my $swap;
++		&getRoot() or Logger->error("Can't get root privileges");
++
++		# Create the swap directories running squid -z
++		`/etc/init.d/squid stop; $squ_bin -z`;
++		General->isSwapCreated(1) if  $? == 0;
++
++		&holdRoot($uid) or die "Can't hold root privileges";
+ 	}
+ } else {
+ 	# An error. This script should not be called without being logged in.
+
+Modified: trunk/templates/es/cache_table.html
+===================================================================
+--- trunk/templates/es/cache_table.html	2005-10-03 19:41:40 UTC (rev 22)
++++ trunk/templates/es/cache_table.html	2005-10-03 21:31:13 UTC (rev 23)
+@@ -4,3 +4,5 @@
+ 					<!-- CACHE_DIRS -->
+ 				</table>
+ 				<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">Agregar nuevo directorio de Cache</a></p></div>
++				<div id="sectForm"><p><a href="sec.pl?act=swap"><!-- SWAP --></a></p></div>
++					<!-- SWAP -->
+
+Modified: trunk/templates/es/status.html
+===================================================================
+--- trunk/templates/es/status.html	2005-10-03 19:41:40 UTC (rev 22)
++++ trunk/templates/es/status.html	2005-10-03 21:31:13 UTC (rev 23)
+@@ -1,6 +1,7 @@
+ <h1>Inicio</h1>
+ 					<p>Bienvenido al Sistema de Navegaci?n Controlada.</p>
+ 					<p><!-- CHANGES --></p>
++					<p>Los directorios de intercambio <!-- SWAP --> han sido creados correctamente.</p>
+ 					<p>Squid est? <!-- SQ-STATUS -->.</p>
+ 					<p><a href=index.pl?sect=status&act=restart>Restart squid and aply the changes</a></p>
+ 					<!-- RES-TITLE -->
+
+
+
+From dasenjo at berlios.de  Tue Oct  4 00:36:58 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Tue, 4 Oct 2005 00:36:58 +0200
+Subject: [Tentaculo-svn] r24 - trunk
+Message-ID: <200510032236.j93Maw2S017262@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-04 00:36:49 +0200 (Tue, 04 Oct 2005)
+New Revision: 24
+
+Modified:
+   trunk/index.pl
+   trunk/sec.pl
+Log:
+Only &getRoot() once in sec.pl
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-10-03 21:31:13 UTC (rev 23)
++++ trunk/index.pl	2005-10-03 22:36:49 UTC (rev 24)
+@@ -57,7 +57,7 @@
+ 		#-- Status section --#
+ 		if(!$act){
+ 			my ($s, $r) = ($sc->param("status"), $sc->param("restart"));
+-			print $cgi->redirect("sec.pl?act=status") unless $s;
++			print $cgi->redirect("sec.pl") unless $s;
+ 			$c = $stat->load($c, $s, $r) if $s;
+ 			$sc->clear(["status"])
+ 		} elsif( $act eq 'restart'){
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-10-03 21:31:13 UTC (rev 23)
++++ trunk/sec.pl	2005-10-03 22:36:49 UTC (rev 24)
+@@ -26,63 +26,55 @@
+ if ( $sc->isLoggedIn() ){
+ 	my $uid = POSIX::getuid();
+ 	my $act = $cgi->url_param('act');
+-	my $stat = $sc->param('status');
++	my $stat = { cha => 0, squ => 0};
+ 
+-	if($act && $act eq 'status'){
+-		my $s = { cha => 0, squ => 0};
+-		&getRoot() or Logger->error("Can't get root privileges");
++	&getRoot() or die "Can't get root privileges: $!";
+ 
+-		# Compare the files to check if the system is controlling squid.
+-		my $diff = `diff etc/squid.conf $squ_cfg`;
+-		if($diff eq '' && $? == 0){ $s->{cha} = 0; } 
+-		else { $s->{cha} = 1; }
++	# Compare the files to check if the system is controlling squid.
++	my $diff = `diff etc/squid.conf $squ_cfg`;
++	if($diff eq '' && $? == 0){ $stat->{cha} = 0; } 
++	else { $stat->{cha} = 1; }
+ 
+-		# Is squid running?
+-		$s->{squ} = 1 if `pgrep squid`;
++	# Is squid running?
++	$stat->{squ} = 1 if `pgrep squid`;
+ 
+-		&holdRoot($uid) or die "Can't hold root privileges";
+-		Logger->message("System status: cha=$s->{cha}, squ=$s->{squ}");
+-		$sc->param('status', $s);
+-	} elsif($act && $act eq 'restart') {
++	$sc->param('status', $stat);
++
++	if($act && $act eq 'restart') {
+ 		my $res = { file => '', act => ''};
+-		&getRoot() or Logger->error("Can't get root privileges");
++
+ 		# Make a backup the first time.
+ 		`cp $squ_cfg $squ_cfg.tent` if (-e $squ_cfg && !-e $squ_cfg."tent");
+ 
+ 		# An easy way: copy the configuration file and reload/start squid.
+ 		`cp -v etc/squid.conf $squ_cfg`;
+ 		if ($? == 0){ $res->{file} .= _("Squid configuration file copied succesfully."); }
+-		else { $res->file .= _("There was errors copying the squid configration file: $!"); }
++		else { $res->{file} .= _("Errors copying the squid configuration file: $!"); }
+ 
+ 		# If squid is running, reconfigure it.
+-		if ($stat && $stat->{squ}){ 
++		if ($stat->{squ} == 1){ 
+ 			my $rec = `$squ_bin -k reconfigure`; 
+ 			if ($? == 0){ $res->{act} .= _("Configuration reloaded succesfully. ");  } 
+-			else { $res->{act} .= _("Error reloading the configuration: $!. "); }
++			else { $res->{act} .= _("Errors reloading the configuration: $!. "); }
+ 			$res->{act} .= _("Command output:").$rec."\n" if $rec;
+ 		}
+ 
+ 		# If squid is stopped, start it.
+-		else {  
++		elsif ($stat->{squ} == 0) {  
+ 			my $rec .= `/etc/init.d/squid start`; 
+ 			if ($? == 0){ $res->{act} .= _("Squid started succesfully. ");  } 
+ 			else { $res->{act} .= _("Error starting squid: $!. ");  }
+ 			$res->{act} .= _("Command output").": $rec" if $rec;
+ 		}
+ 
+-		&holdRoot($uid) or die "Can't hold root privileges";
+ 		$sc->param('restart', $res);
+ 		$sc->expires('restart', '+5s');
+ 	} elsif($act && $act eq 'swap') {
+-		my $swap;
+-		&getRoot() or Logger->error("Can't get root privileges");
+-
+ 		# Create the swap directories running squid -z
+ 		`/etc/init.d/squid stop; $squ_bin -z`;
+ 		General->isSwapCreated(1) if  $? == 0;
+-
+-		&holdRoot($uid) or die "Can't hold root privileges";
+ 	}
++	&holdRoot($uid) or die "Can't hold root privileges";
+ } else {
+ 	# An error. This script should not be called without being logged in.
+ 	Logger->error("sec.pl: the user is  not logged in. This should not happen!"); die $!;
+
+
+
+From dasenjo at berlios.de  Tue Oct  4 00:43:13 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Tue, 4 Oct 2005 00:43:13 +0200
+Subject: [Tentaculo-svn] r25 - in trunk: lib misc templates/es
+Message-ID: <200510032243.j93MhDUY022677@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-04 00:43:12 +0200 (Tue, 04 Oct 2005)
+New Revision: 25
+
+Modified:
+   trunk/lib/General.pm
+   trunk/misc/tentaculo.sql
+   trunk/templates/es/general.html
+Log:
+Dropped enable. The system is always enabled.
+
+
+Modified: trunk/lib/General.pm
+===================================================================
+--- trunk/lib/General.pm	2005-10-03 22:36:49 UTC (rev 24)
++++ trunk/lib/General.pm	2005-10-03 22:43:12 UTC (rev 25)
+@@ -7,7 +7,7 @@
+ use Data::Types qw(:int);
+ 
+ General->table('general');
+-General->columns(All => qw/id enable changed swap http_port visible_hostname append_domain icp_port cache_mem/);
++General->columns(All => qw/id changed swap http_port visible_hostname append_domain icp_port cache_mem/);
+ 
+ sub new{
+ 	my $this = shift;
+@@ -21,7 +21,6 @@
+ 	shift;
+ 	my $g = General->retrieve(1);
+ 	return {
+-		enable		 => 	$g->enable,
+ 		http_port 	 => 	$g->http_port,
+ 		visible_hostname =>	$g->visible_hostname,
+ 		append_domain	 =>	$g->append_domain,
+@@ -40,7 +39,6 @@
+ 	my $ph = shift;
+ 	my $g = General->retrieve(1);
+ 	if ($g){
+-		$g->enable($ph->{gEnable});
+ 		$g->http_port($ph->{gHPort});
+ 		$g->visible_hostname($ph->{gName});
+ 		$g->append_domain($ph->{gDomain});
+@@ -121,7 +119,6 @@
+ 	shift;
+ 	my ($c,$tags) = @_;
+ 	my $s = &getGeneral();
+-	$c =~ s/name="gEnable"/name="gEnable" checked="checked"/ if $s->{enable};
+ 	$c =~ s/name="gHPort"/name="gHPort" value="$s->{http_port}"/ if $s->{http_port};
+ 	$c =~ s/name="gIPort"/name="gIPort" value="$s->{icp_port}"/ if $s->{icp_port};
+ 	$c =~ s/name="gName"/name="gName" value="$s->{visible_hostname}"/ if $s->{visible_hostname};
+
+Modified: trunk/misc/tentaculo.sql
+===================================================================
+--- trunk/misc/tentaculo.sql	2005-10-03 22:36:49 UTC (rev 24)
++++ trunk/misc/tentaculo.sql	2005-10-03 22:43:12 UTC (rev 25)
+@@ -107,7 +107,6 @@
+ 
+ CREATE TABLE general (
+   id int(11) NOT NULL default '1',
+-  enable tinyint(1) NOT NULL default '0',
+   changed tinyint(1) NOT NULL default '0',
+   swap tinyint(1) NOT NULL default '0',
+   http_port smallint(5) unsigned NOT NULL default '3128',
+@@ -122,4 +121,4 @@
+ -- Data for table `general`
+ -- 
+ 
+-INSERT INTO general VALUES (1, 0, 0, 0, 3128, 3130, NULL, NULL, '8M');
++INSERT INTO general VALUES (1, 0, 0, 3128, 3130, NULL, NULL, '8M');
+
+Modified: trunk/templates/es/general.html
+===================================================================
+--- trunk/templates/es/general.html	2005-10-03 22:36:49 UTC (rev 24)
++++ trunk/templates/es/general.html	2005-10-03 22:43:12 UTC (rev 25)
+@@ -3,10 +3,6 @@
+ 						<table id="sectForm">
+ 						<fieldset>
+ 							<tr>
+-							<td><p><label for="gEnable">Activar sistema</label></p></td>
+-							<td><p><input type="checkbox" name="gEnable" id="gEnable" class="check" value="1"/></p></td>
+-							</tr>
+-							<tr>
+ 							<td><p><label for="gHPort">Puerto HTTP</label></p></td>
+ 							<td><p><input type="text" maxlength="5" name="gHPort" id="gHPort"/></p></td>
+ 							</tr>
+
+
+
+From dasenjo at berlios.de  Tue Oct  4 23:55:47 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Tue, 4 Oct 2005 23:55:47 +0200
+Subject: [Tentaculo-svn] r26 - in trunk: . lib templates/es
+Message-ID: <200510042155.j94Ltlax011063@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-04 23:55:46 +0200 (Tue, 04 Oct 2005)
+New Revision: 26
+
+Added:
+   trunk/lib/Acl.pm
+   trunk/templates/es/acl.html
+   trunk/templates/es/acl_row.html
+Modified:
+   trunk/index.pl
+   trunk/lib/Cache.pm
+   trunk/lib/SquidControl.pm
+   trunk/templates/es/admin.html
+Log:
+ACLs support.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/index.pl	2005-10-04 21:55:46 UTC (rev 26)
+@@ -26,9 +26,11 @@
+ # Per-section modules and their objects.
+ use General;
+ use Cache;
++use Acl;
+ use Status;
+ my $gen = General->new();
+ my $cach = Cache->new();
++my $acl = Acl->new();
+ my $stat = Status->new();
+ 
+ # HTML Page variables. t = template. c = content (or template fill).
+@@ -44,7 +46,7 @@
+ 	Logger->message("index.pl vars sect: $sect sub: $sub act: $act");
+ 	
+ 	# Valid content sections
+-	my @csects = qw/general cache settings status/;
++	my @csects = qw/general cache acl settings status/;
+ 
+ 	# The admin page is the interface template used when the user is logged in.
+ 	$t = Template->read('admin');
+@@ -102,6 +104,9 @@
+ 				$c = $cach->result($cach->delDir($id)) if $id;
+ 			}
+ 		}
++	} elsif ( $sect eq 'acl' ) {
++		#-- Status section --#
++		$c = $acl->load($c) unless $act;
+ 	} elsif ( $sect eq 'settings' ) {
+ 		#-- Settings section --#
+ 		if($sub eq 'password'){
+
+Added: trunk/lib/Acl.pm
+===================================================================
+--- trunk/lib/Acl.pm	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/lib/Acl.pm	2005-10-04 21:55:46 UTC (rev 26)
+@@ -0,0 +1,97 @@
++package Acl;
++use base 'DBIBase';
++
++use strict;
++use Logger;
++use General;
++
++Acl->table('acl');
++Acl->columns(All => qw/id name acltype aclstring/);
++
++sub new{
++	my $this = shift;
++	my $class = ref($this) || $this;
++	my $self = {};
++	bless($self,$class);
++	return $self;
++}
++
++sub getAll{
++	shift;
++	my @acls;
++	foreach my $d (Acl->retrieve_all){
++		push @acls, { 	id => $d->id, 
++				name => $d->name, 
++				acltype => $d->acltype, 
++				aclstring => $d->aclstring, 
++		};
++	}
++	return \@acls if @acls;
++	return 0;
++}
++
++sub getAcl{
++	shift;
++	my $d = Acl->retrieve(shift);
++	return{	id => $d->id,
++		name => $d->name, 
++		acltype => $d->acltype, 
++		aclstring => $d->aclstring, 
++	};
++}
++
++sub changeAcl{
++	shift;
++	my $ph = shift;
++	my $cd = Acl->retrieve($ph->{cID});
++	$cd->name($ph->{cDir}) if $cd;
++	$cd->acltype($ph->{cSize}) if $cd;
++	return $cd->update if ($cd && General->isChanged(1) && !General->isSwapCreated(0));
++	return 0;
++}
++
++sub addAcl{
++	shift;
++	my $ph = shift;
++	my $cd = Acl->create({
++		name => $ph->{cDir},
++		acltype => $ph->{cSize},
++	});
++	return $cd if ($cd && General->isChanged(1) && !General->isSwapCreated(0));
++	return 0;
++}
++
++sub delAcl{
++	shift;
++	my $d = Acl->retrieve(shift);
++	return $d->delete() if ($d && General->isChanged(1) && !General->isSwapCreated(0));
++	return 0;
++}
++
++sub load{
++	shift;
++	my ($c, $tags) = @_;
++	my $aa = Acl->getAll;
++
++	if ($aa){
++		my $acls;
++		my $row = Template->read('acl_row');
++		foreach my $acl (@{$aa}){ $acls .= &loadRow($row, $acl); }
++		$c =~ s/<!-- ACLS -->/$acls/;
++	} else {
++		my $no_acl = _("There are not ACLs configured.");
++		$c =~ s/<!-- NO_ACL -->/$no_acl/;
++	}
++	return $c;
++}
++
++sub loadRow{
++	my ($row,$acl) = @_;
++	$row =~ s/ID/$acl->{id}/g;
++	$row =~ s/<!-- NAME -->/$acl->{name}/;
++	$row =~ s/<!-- ACLTYPE -->/$acl->{acltype}/;
++	$row =~ s/<!-- ACLSTRING -->/$acl->{aclstring}/;
++	return $row;
++}
++
++1;
+
+
+Property changes on: trunk/lib/Acl.pm
+___________________________________________________________________
+Name: svn:executable
+   + *
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/lib/Cache.pm	2005-10-04 21:55:46 UTC (rev 26)
+@@ -139,8 +139,9 @@
+ sub loadCacheRow{
+ 	my ($row,$dir) = @_;
+ 	$row =~ s/ID/$dir->{id}/g;
+-	$row =~ s/<!-- DIR -->/$dir->{directory}/;
+-	$row =~ s/<!-- SIZE -->/$dir->{size}/;
++	$row =~ s/<!-- NAME -->/$dir->{name}/;
++	$row =~ s/<!-- ACLTYPE -->/$dir->{acltype}/;
++	$row =~ s/<!-- ACLSTRING -->/$dir->{aclstring}/;
+ 	return $row;
+ }
+ 
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/lib/SquidControl.pm	2005-10-04 21:55:46 UTC (rev 26)
+@@ -68,10 +68,7 @@
+ 	$ret .= "# -----------------------------------------------------------\n";
+ 	$ret .= "#############################################################\n\n";
+ 	# Default values. Squid recommended.
+-	$ret .= "acl all src 0.0.0.0/0.0.0.0\n";
+ 	$ret .= "acl manager proto cache_object\n";
+-	$ret .= "acl localhost src 127.0.0.1/255.255.255.255\n";
+-	$ret .= "acl to_localhost dst 127.0.0.0/8\n";
+ 	$ret .= "acl SSL_ports port 443 563	# https, snews\n";
+ 	$ret .= "acl SSL_ports port 873		# rsync\n";
+ 	$ret .= "acl Safe_ports port 80		# http\n";
+@@ -89,6 +86,10 @@
+ 	$ret .= "acl Safe_ports port 901		# SWAT\n";
+ 	$ret .= "acl purge method PURGE\n";
+ 	$ret .= "acl CONNECT method CONNECT\n";
++	# Write a tag for each cache dir entrie.
++	my $acls = Acl->getAll();
++	if($acls){ for(@{$acls}){$ret .="acl ".$_->{name}." ".$_->{acltype}." ".$_->{aclstring}; }}
++	return $ret;
+ }
+ 
+ sub http_access {
+
+Added: trunk/templates/es/acl.html
+===================================================================
+--- trunk/templates/es/acl.html	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/templates/es/acl.html	2005-10-04 21:55:46 UTC (rev 26)
+@@ -0,0 +1,11 @@
++<h1>Listas de Control de Acceso</h1>
++				<table id="sectForm">
++					<tr>
++					<td><p class="theader">Nombre</p></td>
++					<td><p class="theader">Tipo</p></td>
++					<td><p class="theader">Cadena</p></td>
++					</tr>
++					<!-- ACLS -->
++				</table>
++				<div id="sectForm"><p><!-- NO_ACL --></p></div>
++				<div id="sectForm"><p><a href="index.pl?sect=acl&act=new">Agregar nueva ACL</a></p></div>
+
+Added: trunk/templates/es/acl_row.html
+===================================================================
+--- trunk/templates/es/acl_row.html	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/templates/es/acl_row.html	2005-10-04 21:55:46 UTC (rev 26)
+@@ -0,0 +1,7 @@
++						<tr>
++						<td><p><!-- NAME --></p></td>
++						<td><p><!-- ACLTYPE --></p></td>
++						<td><p><!-- ACLSTRING --></p></td>
++						<td><p><a href="index.pl?sect=acl&act=change&id=ID">Cambiar</a></p></td>
++						<td><p><a href="index.pl?sect=acl&act=del&id=ID">Eliminar</a></p></td>
++						</tr>
+
+Modified: trunk/templates/es/admin.html
+===================================================================
+--- trunk/templates/es/admin.html	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/templates/es/admin.html	2005-10-04 21:55:46 UTC (rev 26)
+@@ -18,6 +18,7 @@
+ 						<li><a href="index.pl">Estado</a></li>
+ 						<li><a href="index.pl?sect=general">General</a></li>
+ 						<li><a href="index.pl?sect=cache">Cache</a></li>
++						<li><a href="index.pl?sect=acl">ACL</a></li>
+ 						<li><a href="index.pl?sect=settings">Preferencias</a></li>
+ 						<li><a href="index.pl?sect=logout">Salir</a></li>
+ 					</ul>
+
+
+
+From dasenjo at berlios.de  Wed Oct  5 18:27:09 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Wed, 5 Oct 2005 18:27:09 +0200
+Subject: [Tentaculo-svn] r27 - in trunk: . lib templates/es
+Message-ID: <200510051627.j95GR9Mp007453@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-05 18:27:08 +0200 (Wed, 05 Oct 2005)
+New Revision: 27
+
+Added:
+   trunk/templates/es/newAcl.html
+Modified:
+   trunk/index.pl
+   trunk/lib/Acl.pm
+   trunk/lib/Cache.pm
+   trunk/lib/SquidControl.pm
+   trunk/sec.pl
+Log:
+Bug fixes and more on acls.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/index.pl	2005-10-05 16:27:08 UTC (rev 27)
+@@ -107,6 +107,13 @@
+ 	} elsif ( $sect eq 'acl' ) {
+ 		#-- Status section --#
+ 		$c = $acl->load($c) unless $act;
++		if ( $act eq 'new' ){
++			$c = $acl->newAcl();
++		} elsif ( $act eq 'add'){
++			my $err = $acl->validateAcl($phr);
++			$c = $acl->result($acl->addAcl($phr)) unless $err;
++			$c = $acl->newAcl($err) if $err;
++		}
+ 	} elsif ( $sect eq 'settings' ) {
+ 		#-- Settings section --#
+ 		if($sub eq 'password'){
+
+Modified: trunk/lib/Acl.pm
+===================================================================
+--- trunk/lib/Acl.pm	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/lib/Acl.pm	2005-10-05 16:27:08 UTC (rev 27)
+@@ -32,32 +32,35 @@
+ 
+ sub getAcl{
+ 	shift;
+-	my $d = Acl->retrieve(shift);
+-	return{	id => $d->id,
+-		name => $d->name, 
+-		acltype => $d->acltype, 
+-		aclstring => $d->aclstring, 
+-	};
++	my $a = Acl->retrieve(shift);
++	return{	id => $a->id,
++		name => $a->name, 
++		acltype => $a->acltype, 
++		aclstring => $a->aclstring, 
++	} if $a;
++	return 0;
+ }
+ 
+ sub changeAcl{
+ 	shift;
+ 	my $ph = shift;
+-	my $cd = Acl->retrieve($ph->{cID});
+-	$cd->name($ph->{cDir}) if $cd;
+-	$cd->acltype($ph->{cSize}) if $cd;
+-	return $cd->update if ($cd && General->isChanged(1) && !General->isSwapCreated(0));
++	my $dir = Acl->retrieve($ph->{cID});
++	$dir->name($ph->{aName}) if $dir;
++	$dir->acltype($ph->{aType}) if $dir;
++	$dir->aclstring($ph->{aString}) if $dir;
++	return $dir->update if ($dir && General->isChanged(1));
+ 	return 0;
+ }
+ 
+ sub addAcl{
+ 	shift;
+ 	my $ph = shift;
+-	my $cd = Acl->create({
+-		name => $ph->{cDir},
+-		acltype => $ph->{cSize},
++	my $acl = Acl->create({
++		name => $ph->{aName},
++		acltype => $ph->{aType},
++		aclstring => $ph->{aString},
+ 	});
+-	return $cd if ($cd && General->isChanged(1) && !General->isSwapCreated(0));
++	return $acl if ( $acl && General->isChanged(1) );
+ 	return 0;
+ }
+ 
+@@ -94,4 +97,59 @@
+ 	return $row;
+ }
+ 
++sub newAcl{
++	my ($self, $tags) = @_;
++	my $c = Template->read('newAcl');
++	if ($tags){
++		my $m = _("There was errrors validating the data for the new cache directory.");
++		foreach (@{$tags}){
++			$m .= _(" The entered name seems to be wrong.") if $_ eq 'aName';	
++			$m .= _(" The entered type seems to be wrong.") if $_ eq 'aType';	
++			$m .= _(" The entered string seems to be wrong.") if $_ eq 'aString';	
++		}
++		$c =~ s/<!-- MESSAGE -->/$m/;
++	}
++	return $c;
++}
++
++sub result{
++	shift;
++	my $r = @_;
++	my ($t, $m);
++	my $res = Template->read('result');
++	if ($r){ 
++		$t = _('Successful change'); 
++		$m = _('The ACL Configuration has been changed successfully.');
++	} else { 
++		$t = _('Unsuccessful change'); 
++		$m = _('There was a problem trying to apply the changes. Please try again.')
++	}
++	$res =~ s/<!-- TITLE -->/$t/;
++	$res =~ s/<!-- MESSAGE -->/$m/;
++	$res =~ s/SECTION/acl/g;
++	return $res;
++}
++
++sub validateAcl{
++	shift;
++	my $ph = shift;
++	my @tags;		# Invalid tags
++
++	# The name must be a word.
++	push(@tags,'aName') unless $ph->{aName} =~ /\w/;
++
++	# The type must be one of src, dst, port or proto.
++	push(@tags,'aType') unless $ph->{aType} =~ /src|dst|port|proto/;
++
++	# The string depends on the type.
++	if($ph->{aType} eq 'src' or $ph->{aType} eq 'dst'){
++	my $regexp =    '^((\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.){3}
++			(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$';
++		push(@tags,'aString') unless $ph->{aString} =~ /$regexp/x;
++	}
++
++	return \@tags if @tags;
++	return 0;
++}
++
+ 1;
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/lib/Cache.pm	2005-10-05 16:27:08 UTC (rev 27)
+@@ -139,9 +139,8 @@
+ sub loadCacheRow{
+ 	my ($row,$dir) = @_;
+ 	$row =~ s/ID/$dir->{id}/g;
+-	$row =~ s/<!-- NAME -->/$dir->{name}/;
+-	$row =~ s/<!-- ACLTYPE -->/$dir->{acltype}/;
+-	$row =~ s/<!-- ACLSTRING -->/$dir->{aclstring}/;
++	$row =~ s/<!-- DIR -->/$dir->{directory}/;
++	$row =~ s/<!-- SIZE -->/$dir->{size}/;
+ 	return $row;
+ }
+ 
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/lib/SquidControl.pm	2005-10-05 16:27:08 UTC (rev 27)
+@@ -31,11 +31,13 @@
+ 
+ sub general {
+ 	shift;
+-	my ($ret, $g, @tags) = ('', '', ('http_port','icp_port', 'visible_hostname'));
++	my ($ret, $g);
++	my @tags = ('http_port', 'icp_port', 'visible_hostname', 'append_domain');
+ 	$ret  =	"# GENERAL OPTIONS\n";
+ 	$ret .= "# -----------------------------------------------------------\n";
+ 	$ret .= "#############################################################\n\n";
+ 	$g = General->getGeneral();
++	$g->{append_domain} = ".".$g->{append_domain};
+ 	foreach my $tag (@tags){  $ret .= &simpleTag($tag, $g->{$tag}) if $g->{$tag}; }
+ 	return $ret;
+ }
+@@ -88,7 +90,7 @@
+ 	$ret .= "acl CONNECT method CONNECT\n";
+ 	# Write a tag for each cache dir entrie.
+ 	my $acls = Acl->getAll();
+-	if($acls){ for(@{$acls}){$ret .="acl ".$_->{name}." ".$_->{acltype}." ".$_->{aclstring}; }}
++	if($acls){ for(@{$acls}){$ret .="acl ".$_->{name}." ".$_->{acltype}." ".$_->{aclstring}."\n"; }}
+ 	return $ret;
+ }
+ 
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/sec.pl	2005-10-05 16:27:08 UTC (rev 27)
+@@ -31,7 +31,7 @@
+ 	&getRoot() or die "Can't get root privileges: $!";
+ 
+ 	# Compare the files to check if the system is controlling squid.
+-	my $diff = `diff etc/squid.conf $squ_cfg`;
++	my $diff = `diff etc/squid.conf $squ_cfg 2>&1`;
+ 	if($diff eq '' && $? == 0){ $stat->{cha} = 0; } 
+ 	else { $stat->{cha} = 1; }
+ 
+@@ -53,7 +53,7 @@
+ 
+ 		# If squid is running, reconfigure it.
+ 		if ($stat->{squ} == 1){ 
+-			my $rec = `$squ_bin -k reconfigure`; 
++			my $rec = `$squ_bin -k reconfigure 2>&1`; 
+ 			if ($? == 0){ $res->{act} .= _("Configuration reloaded succesfully. ");  } 
+ 			else { $res->{act} .= _("Errors reloading the configuration: $!. "); }
+ 			$res->{act} .= _("Command output:").$rec."\n" if $rec;
+@@ -61,7 +61,7 @@
+ 
+ 		# If squid is stopped, start it.
+ 		elsif ($stat->{squ} == 0) {  
+-			my $rec .= `/etc/init.d/squid start`; 
++			my $rec .= `/etc/init.d/squid start 2>&1`; 
+ 			if ($? == 0){ $res->{act} .= _("Squid started succesfully. ");  } 
+ 			else { $res->{act} .= _("Error starting squid: $!. ");  }
+ 			$res->{act} .= _("Command output").": $rec" if $rec;
+
+Added: trunk/templates/es/newAcl.html
+===================================================================
+--- trunk/templates/es/newAcl.html	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/templates/es/newAcl.html	2005-10-05 16:27:08 UTC (rev 27)
+@@ -0,0 +1,31 @@
++<h1>Creaci?n de una nueva ACL</h1>
++					<form action="index.pl?sect=acl" method="post">
++					<table id="sectForm"><fieldset>
++						<p><input type="hidden" name="aID" id="aID"/></p>
++						<tr>
++						<td><p><label for="aName">Nombre</label></p></td>
++						<td><p><input type="text" name="aName" id="aName"/></p></td>
++						</tr>
++						<tr>
++						<td><p><label for="aType">Tipo</label></p></td>
++						<td><p><select name="aType" id="aType"/>
++							<option>src
++							<option>dst
++							<option>port
++							<option>proto
++						</select></p></td>
++						</tr>
++						<tr>
++						<td><p><label for="aString">Cadena</label></p></td>
++						<td><p><input type="text" name="aString" id="aString"/></p></td>
++						</tr>
++						<tr>
++						<p><input type="hidden" name="act" value="add"/></p>
++					</fieldset>
++					<fieldset id="aSubmit">
++						<tr>
++						<td colspan="2" id="bSumbit"><p><input type="submit" name="aSubmitB" id="aSubmitB" value="Agregar ACL" /></p></td>
++						</tr>
++					</fieldset></table>
++					</form>
++					<!-- MESSAGE -->
+
+
+
+From dasenjo at berlios.de  Sat Oct  8 00:45:37 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Sat, 8 Oct 2005 00:45:37 +0200
+Subject: [Tentaculo-svn] r28 - trunk/lib
+Message-ID: <200510072245.j97MjbCU006765@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-08 00:45:35 +0200 (Sat, 08 Oct 2005)
+New Revision: 28
+
+Modified:
+   trunk/lib/Acl.pm
+Log:
+Acl Validation 
+
+
+Modified: trunk/lib/Acl.pm
+===================================================================
+--- trunk/lib/Acl.pm	2005-10-05 16:27:08 UTC (rev 27)
++++ trunk/lib/Acl.pm	2005-10-07 22:45:35 UTC (rev 28)
+@@ -4,6 +4,7 @@
+ use strict;
+ use Logger;
+ use General;
++use Data::Types qw(:int);
+ 
+ Acl->table('acl');
+ Acl->columns(All => qw/id name acltype aclstring/);
+@@ -143,9 +144,19 @@
+ 
+ 	# The string depends on the type.
+ 	if($ph->{aType} eq 'src' or $ph->{aType} eq 'dst'){
+-	my $regexp =    '^((\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.){3}
+-			(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$';
++		# If src or dst, the string must be an IP address or network.
++		my $regexp =    '^((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.){3}
++				(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])
++				(\/(((0|255)\.){3}(0|255)|\d{1,2}))?$';
+ 		push(@tags,'aString') unless $ph->{aString} =~ /$regexp/x;
++	} elsif ($ph->{aType} eq 'port') {
++		my $port = $ph->{aString};
++		if($port =~ /^\d+$/){
++			$port = to_int($port);
++			push(@tags,'aString') if ($port < 1 || $port > 65535);
++		} else { push(@tags,'aString'); }
++	} elsif ($ph->{aType} eq 'proto'){
++		push(@tags,'aString') unless $ph->{aString} =~ /(cache_object|http|ftp)/;
+ 	}
+ 
+ 	return \@tags if @tags;
+
+
+
+From dasenjo at berlios.de  Wed Oct 19 18:59:45 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Wed, 19 Oct 2005 18:59:45 +0200
+Subject: [Tentaculo-svn] r29 - trunk
+Message-ID: <200510191659.j9JGxj7d023480@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-19 18:59:44 +0200 (Wed, 19 Oct 2005)
+New Revision: 29
+
+Modified:
+   trunk/index.pl
+Log:
+lib path
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-10-07 22:45:35 UTC (rev 28)
++++ trunk/index.pl	2005-10-19 16:59:44 UTC (rev 29)
+@@ -4,7 +4,9 @@
+ 
+ # Always use strict. Application modules are in the 'lib' directory.
+ use strict;
+-use lib './lib';
++my $path;
++if($0 =~ /(.*)index\.pl/){ $path = $1; }
++use lib $path.'/lib';
+ 
+ # CGI stuff.
+ use CGI;
+@@ -63,6 +65,7 @@
+ 			$c = $stat->load($c, $s, $r) if $s;
+ 			$sc->clear(["status"])
+ 		} elsif( $act eq 'restart'){
++			Logger->message("Redirecting to sec.pl (restart)");
+ 			print $cgi->redirect("sec.pl?act=restart");
+ 		}
+ 	} elsif ( $sect eq 'general' ) {
+@@ -149,4 +152,4 @@
+ 
+ # Replace the content in the template and print it if exists, else log an error.
+ $t =~ s/<!-- CONTENT -->/$c/ if ($t && $c);
+-print $cgi->header(-cookie=>$sc->cookie),$t if $t; 
++print $cgi->header(-cookie=>$sc->cookie),$t if $t;
+
+
+
+From dasenjo at berlios.de  Wed Oct 19 23:18:09 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Wed, 19 Oct 2005 23:18:09 +0200
+Subject: [Tentaculo-svn] r30 - trunk
+Message-ID: <200510192118.j9JLI9DN021736@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-19 23:18:09 +0200 (Wed, 19 Oct 2005)
+New Revision: 30
+
+Modified:
+   trunk/sec.pl
+Log:
+sec.pl modifications
+
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-10-19 16:59:44 UTC (rev 29)
++++ trunk/sec.pl	2005-10-19 21:18:09 UTC (rev 30)
+@@ -8,6 +8,9 @@
+ 
+ # General system general modules.
+ use CGI;
++use CGI::Carp qw(fatalsToBrowser warningsToBrowser);
++$CGI::POST_MAX = 1024 * 100;  	# 100K max. posts
++$CGI::DISABLE_UPLOADS = 1;  	# without uploads
+ use POSIX;
+ use SessionControl;
+ use Logger;
+@@ -15,6 +18,7 @@
+ use General;
+ 
+ # Squid vars
++my $loc_squ_cfg = "/var/www/html/tentaculo/etc/squid.conf";
+ my $squ_cfg = "/etc/squid/squid.conf";
+ my $squ_bin = "/usr/sbin/squid";
+ my $squ_user = "proxy";
+@@ -25,13 +29,14 @@
+ 
+ if ( $sc->isLoggedIn() ){
+ 	my $uid = POSIX::getuid();
+-	my $act = $cgi->url_param('act');
++	my $act = $cgi->url_param('act') || 'status';
+ 	my $stat = { cha => 0, squ => 0};
+ 
++	Logger->message("sec.pl called. act: $act");
+ 	&getRoot() or die "Can't get root privileges: $!";
+ 
+ 	# Compare the files to check if the system is controlling squid.
+-	my $diff = `diff etc/squid.conf $squ_cfg 2>&1`;
++	my $diff = `diff $loc_squ_cfg $squ_cfg 2>&1`;
+ 	if($diff eq '' && $? == 0){ $stat->{cha} = 0; } 
+ 	else { $stat->{cha} = 1; }
+ 
+@@ -40,22 +45,26 @@
+ 
+ 	$sc->param('status', $stat);
+ 
+-	if($act && $act eq 'restart') {
++	if($act eq 'restart') {
+ 		my $res = { file => '', act => ''};
+ 
+ 		# Make a backup the first time.
+ 		`cp $squ_cfg $squ_cfg.tent` if (-e $squ_cfg && !-e $squ_cfg."tent");
+ 
+ 		# An easy way: copy the configuration file and reload/start squid.
+-		`cp -v etc/squid.conf $squ_cfg`;
+-		if ($? == 0){ $res->{file} .= _("Squid configuration file copied succesfully."); }
+-		else { $res->{file} .= _("Errors copying the squid configuration file: $!"); }
++		`cp -v $loc_squ_cfg $squ_cfg`;
++		if ($? == 0){ 
++			$res->{file} .= _("Squid configuration file copied succesfully."); 
++			Logger->message("Conf file copied");
++		} else { $res->{file} .= _("Errors copying the squid configuration file: $!"); }
+ 
+ 		# If squid is running, reconfigure it.
+ 		if ($stat->{squ} == 1){ 
+ 			my $rec = `$squ_bin -k reconfigure 2>&1`; 
+-			if ($? == 0){ $res->{act} .= _("Configuration reloaded succesfully. ");  } 
+-			else { $res->{act} .= _("Errors reloading the configuration: $!. "); }
++			if ($? == 0){ 
++				$res->{act} .= _("Configuration reloaded succesfully. ");  
++				Logger->message("Squid reconfigured");
++			} else { $res->{act} .= _("Errors reloading the configuration: $!. "); }
+ 			$res->{act} .= _("Command output:").$rec."\n" if $rec;
+ 		}
+ 
+@@ -68,8 +77,7 @@
+ 		}
+ 
+ 		$sc->param('restart', $res);
+-		$sc->expires('restart', '+5s');
+-	} elsif($act && $act eq 'swap') {
++	} elsif( $act eq 'swap' ) {
+ 		# Create the swap directories running squid -z
+ 		`/etc/init.d/squid stop; $squ_bin -z`;
+ 		General->isSwapCreated(1) if  $? == 0;
+@@ -80,6 +88,8 @@
+ 	Logger->error("sec.pl: the user is  not logged in. This should not happen!"); die $!;
+ }
+ 
++$sc->flush();
++Logger->message("Redirecting to index.pl");
+ print $cgi->redirect("index.pl");
+ 
+ sub getRoot{
+
+
+
+From dasenjo at berlios.de  Thu Oct 20 16:54:45 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Thu, 20 Oct 2005 16:54:45 +0200
+Subject: [Tentaculo-svn] r31 - in trunk: . lib misc
+Message-ID: <200510201454.j9KEsjqU018708@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-10-20 16:54:45 +0200 (Thu, 20 Oct 2005)
+New Revision: 31
+
+Modified:
+   trunk/index.pl
+   trunk/lib/Acl.pm
+   trunk/lib/Logger.pm
+   trunk/lib/SessionControl.pm
+   trunk/lib/SquidControl.pm
+   trunk/lib/Template.pm
+   trunk/misc/tentaculo.sql
+Log:
+Changes.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-10-19 21:18:09 UTC (rev 30)
++++ trunk/index.pl	2005-10-20 14:54:45 UTC (rev 31)
+@@ -4,9 +4,7 @@
+ 
+ # Always use strict. Application modules are in the 'lib' directory.
+ use strict;
+-my $path;
+-if($0 =~ /(.*)index\.pl/){ $path = $1; }
+-use lib $path.'/lib';
++use lib './lib';
+ 
+ # CGI stuff.
+ use CGI;
+@@ -66,7 +64,7 @@
+ 			$sc->clear(["status"])
+ 		} elsif( $act eq 'restart'){
+ 			Logger->message("Redirecting to sec.pl (restart)");
+-			print $cgi->redirect("sec.pl?act=restart");
++			print $cgi->redirect("http://localhost/tentaculo/sec.pl?act=restart");
+ 		}
+ 	} elsif ( $sect eq 'general' ) {
+ 		#-- General section --#
+
+Modified: trunk/lib/Acl.pm
+===================================================================
+--- trunk/lib/Acl.pm	2005-10-19 21:18:09 UTC (rev 30)
++++ trunk/lib/Acl.pm	2005-10-20 14:54:45 UTC (rev 31)
+@@ -147,7 +147,7 @@
+ 		# If src or dst, the string must be an IP address or network.
+ 		my $regexp =    '^((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.){3}
+ 				(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])
+-				(\/(((0|255)\.){3}(0|255)|\d{1,2}))?$';
++				(\/(((0|255)\.){3}(0|128|255)|\d{1,2}))?$';
+ 		push(@tags,'aString') unless $ph->{aString} =~ /$regexp/x;
+ 	} elsif ($ph->{aType} eq 'port') {
+ 		my $port = $ph->{aString};
+
+Modified: trunk/lib/Logger.pm
+===================================================================
+--- trunk/lib/Logger.pm	2005-10-19 21:18:09 UTC (rev 30)
++++ trunk/lib/Logger.pm	2005-10-20 14:54:45 UTC (rev 31)
+@@ -3,11 +3,13 @@
+ use strict;
+ use Carp;
+ 
++my $log_dir = "/var/www/html/tentaculo/log";
++
+ sub message {
+ 	# Writes a message log entry.
+ 	shift;
+ 	my $message = shift;
+-	open REG, ">>log/messages" or die "Could not open file: ".$!;
++	open REG, ">>$log_dir/messages" or die "Could not open file: ".$!;
+ 	print REG localtime()." ".$message."\n";
+ 	close(REG) or die "Could not close file:  ".$!;
+ }
+@@ -17,7 +19,7 @@
+ 	shift;
+ 	my $message = shift;
+ 	print STDERR "Logging error: ".$message;
+-	open REG, ">>log/errors" or die "Could not open file:  ".$!;
++	open REG, ">>$log_dir/errors" or die "Could not open file:  ".$!;
+ 	print REG Carp::longmess(localtime()." ".$message."\n");
+ 	close(REG) or die "Could not close file: ".$!;
+ }
+
+Modified: trunk/lib/SessionControl.pm
+===================================================================
+--- trunk/lib/SessionControl.pm	2005-10-19 21:18:09 UTC (rev 30)
++++ trunk/lib/SessionControl.pm	2005-10-20 14:54:45 UTC (rev 31)
+@@ -20,14 +20,13 @@
+ 
+ sub cookie{
+ 	my $self = shift;
+-	if(@_) { $self->{cookie} = shift; }
+ 	return $self->{cookie};
+ }
+ 
+ sub param{
+ 	my $self = shift;
+ 	my $variable = shift;
+-	if (@_){ return $self->{session}->param($variable,shift);}
++	if (@_){ return $self->{session}->param($variable,shift) if $self->{session};}
+ 	else {my $ret = $self->{session}->param($variable) || '' ; return $ret; }
+ }
+ 
+@@ -44,6 +43,11 @@
+ 	return $self->{session}->expires($variable,$time);
+ }
+ 
++sub flush{
++	my $self = shift;
++	return $self->{session}->flush();
++}
++
+ sub check{
+ 	my $self = shift;
+ 	my $ph = shift;
+@@ -54,7 +58,7 @@
+ 		$self->{session}->expires('logged_in',"+10m");
+ 		$self->param('user_name',$u);
+ 		$self->param('user_id',$id);
+-		Logger->message("User logged in with user name $u");
++		Logger->message("User logged in with user name $u, id: ".$self->{session}->id);
+ 		return 1;
+ 	} else { return 0; }
+ }
+@@ -72,22 +76,29 @@
+ }
+ 
+ sub startSession{
+-	my $self = shift;
+-	my $cgi = $self->{cgi};
+-	my $id = $cgi->cookie('CGISESSID') || $cgi->url_param('sid') || $cgi->param('sid') || undef;
++        my $self = shift;
++        my $cgi = $self->{cgi};
++        my $id = $cgi->cookie('CGISESSID') || $cgi->url_param('sid') || $cgi->param('sid') || undef;
+ 	$self->{session} = new CGI::Session(undef, $id, {Directory=>'/tmp'});
+-	$self->{cookie} = $cgi->cookie(CGISESSID => $self->{session}->id);
+-	Logger->message("NEW session. id=".$self->{session}->id) unless $id; # Log if new sessid
++        $self->{cookie} = $cgi->cookie(CGISESSID => $self->{session}->id());
++        Logger->message("NEW session. id=".$self->{session}->id) unless $id; # Log if new sessid
+ }
+ 
+ sub isLoggedIn{
+ 	my $self = shift;
+-	return $self->{session}->param("logged_in");
++	if ($self->{session}){
++		Logger->message("Checking logged_in for id:".$self->{session}->id);
++		return $self->{session}->param("logged_in");
++	} else {
++		Logger->error('No $self->session');
++		return 0;
++	}
+ }
+ 
+ sub logOut{
+ 	my $self = shift;
+ 	$self->{session}->delete();
++	undef $self;
+ }
+ 
+ 1;
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-10-19 21:18:09 UTC (rev 30)
++++ trunk/lib/SquidControl.pm	2005-10-20 14:54:45 UTC (rev 31)
+@@ -5,6 +5,8 @@
+ use Cache_Dir;
+ use Logger;
+ 
++my $loc_squ_cfg = "/var/www/html/tentaculo/etc/squid.conf";
++
+ sub new{
+ 	my $this = shift;
+ 	my $class = ref($this) || $this;
+@@ -15,8 +17,9 @@
+ 
+ sub writeFile{
+ 	shift;
++	Logger->message("writeFile called");
+ 	my $cont = &header().&general().&cache().&acl().&http_access();
+-	open(FILE,">etc/squid.conf") or die "Error: ".$!;
++	open(FILE,">$loc_squ_cfg") or die "Error: ".$!;
+ 	print FILE $cont;
+ 	close(FILE);
+ 	return General->isChanged(0);
+@@ -37,7 +40,7 @@
+ 	$ret .= "# -----------------------------------------------------------\n";
+ 	$ret .= "#############################################################\n\n";
+ 	$g = General->getGeneral();
+-	$g->{append_domain} = ".".$g->{append_domain};
++	$g->{append_domain} = ".".$g->{append_domain} if $g->{append_domain};
+ 	foreach my $tag (@tags){  $ret .= &simpleTag($tag, $g->{$tag}) if $g->{$tag}; }
+ 	return $ret;
+ }
+@@ -70,7 +73,6 @@
+ 	$ret .= "# -----------------------------------------------------------\n";
+ 	$ret .= "#############################################################\n\n";
+ 	# Default values. Squid recommended.
+-	$ret .= "acl manager proto cache_object\n";
+ 	$ret .= "acl SSL_ports port 443 563	# https, snews\n";
+ 	$ret .= "acl SSL_ports port 873		# rsync\n";
+ 	$ret .= "acl Safe_ports port 80		# http\n";
+@@ -98,7 +100,7 @@
+ 	shift;
+ 	my $ret;
+ 	# Only allow cachemgr access from localhost
+-	$ret .= "http_access allow manager localhost\n";
++	$ret .= "\nhttp_access allow manager localhost\n";
+ 	$ret .= "http_access deny manager\n";
+ 	# Only allow purge requests from localhost
+ 	$ret .= "http_access allow purge localhost\n";
+@@ -106,9 +108,13 @@
+ 	$ret .= "# Deny requests to unknown ports\n";
+ 	$ret .= "http_access deny !Safe_ports\n";
+ 	# Deny CONNECT to other than SSL ports
+-	$ret .= "http_access deny CONNECT !SSL_ports\n";
++	$ret .= "http_access deny CONNECT !SSL_ports\n\n";
+ 	# INSERT YOUR OWN RULE(S) HERE TO ALLOW ACCESS FROM YOUR CLIENTS
+ 	$ret .= "http_access allow localhost\n";
++	$ret .= "http_access allow asmet\n";
++	$ret .= "http_access allow chemonics\n";
++	$ret .= "http_access allow ha-cauca\n";
++	$ret .= "http_access allow andrespc\n";
+ 	# And finally deny all other access to this proxy
+ 	$ret .= "http_access deny all\n";
+ 	return $ret;
+
+Modified: trunk/lib/Template.pm
+===================================================================
+--- trunk/lib/Template.pm	2005-10-19 21:18:09 UTC (rev 30)
++++ trunk/lib/Template.pm	2005-10-20 14:54:45 UTC (rev 31)
+@@ -4,9 +4,11 @@
+ use Logger;
+ use I18N;
+ 
++my $tmpl_dir = "/var/www/html/tentaculo/templates/";
++
+ sub read{
+ 	shift;
+-	my $file = "templates/".I18N->getLanguage()."/".shift().".html";
++	my $file = $tmpl_dir.I18N->getLanguage()."/".shift().".html";
+ 	Logger->message("file: $file");
+ 	open(FILE,"<$file") or die "Could not open file ".$file."Error: ".$!;
+ 	my @content=<FILE>;
+
+Modified: trunk/misc/tentaculo.sql
+===================================================================
+--- trunk/misc/tentaculo.sql	2005-10-19 21:18:09 UTC (rev 30)
++++ trunk/misc/tentaculo.sql	2005-10-20 14:54:45 UTC (rev 31)
+@@ -22,7 +22,7 @@
+ CREATE TABLE acl (
+   id int(10) unsigned NOT NULL auto_increment,
+   name varchar(20) default NULL,
+-  acltype char(1) default NULL,
++  acltype varchar(8) default NULL,
+   aclstring varchar(255) default NULL,
+   PRIMARY KEY  (id)
+ ) AUTO_INCREMENT=1 ;
+@@ -84,7 +84,7 @@
+   ad char(1) default NULL,
+   aclname varchar(20) default NULL,
+   delay_pool_id int(10) unsigned default NULL
+-) TYPE=MyISAM;
++);
+ 
+ -- --------------------------------------------------------
+ 
+@@ -115,10 +115,10 @@
+   append_domain varchar(255) default NULL,
+   cache_mem varchar(20) NOT NULL default '8M',
+   PRIMARY KEY  (id)
+-) TYPE=MyISAM;
++);
+ 
+ -- 
+ -- Data for table `general`
+ -- 
+ 
+-INSERT INTO general VALUES (1, 0, 0, 3128, 3130, NULL, NULL, '8M');
++INSERT INTO general VALUES (1, 0, 0, 3128, 3130, NULL, NULL, '8 Mb');
+
+
+

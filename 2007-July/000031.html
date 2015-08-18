@@ -1,0 +1,266 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r33 - in trunk: . doc lib templates/es
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r33%20-%20in%20trunk%3A%20.%20doc%20lib%20templates/es&In-Reply-To=%3C200707312014.l6VKEIu2014318%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000030.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r33 - in trunk: . doc lib templates/es</H1>
+    <B>dasenjo at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r33%20-%20in%20trunk%3A%20.%20doc%20lib%20templates/es&In-Reply-To=%3C200707312014.l6VKEIu2014318%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r33 - in trunk: . doc lib templates/es">dasenjo at mail.berlios.de
+       </A><BR>
+    <I>Tue Jul 31 22:14:18 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000030.html">[Tentaculo-svn] r32 - in trunk: . log
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#31">[ date ]</a>
+              <a href="thread.html#31">[ thread ]</a>
+              <a href="subject.html#31">[ subject ]</a>
+              <a href="author.html#31">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2007-07-31 22:14:18 +0200 (Tue, 31 Jul 2007)
+New Revision: 33
+
+Added:
+   trunk/templates/es/user.html
+Removed:
+   trunk/templates/es/admin.html
+Modified:
+   trunk/doc/CHANGELOG
+   trunk/index.pl
+   trunk/lib/Admin.pm
+   trunk/lib/Logger.pm
+   trunk/lib/SessionControl.pm
+   trunk/lib/Template.pm
+   trunk/templates/es/login.html
+Log:
+* Admin module is now User module.
+* More simple directories name in Logger and Template modules.
+
+
+
+Modified: trunk/doc/CHANGELOG
+===================================================================
+--- trunk/doc/CHANGELOG	2007-07-17 19:32:27 UTC (rev 32)
++++ trunk/doc/CHANGELOG	2007-07-31 20:14:18 UTC (rev 33)
+@@ -1,2 +1,4 @@
+-2005-09-07
+-* Changed css class for all forms to &quot;sectForm&quot;
++2007-07-31:
++* New CHANGELOG :)
++* Admin module is now User module.
++* More simple directories name in Logger and Template modules.
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2007-07-17 19:32:27 UTC (rev 32)
++++ trunk/index.pl	2007-07-31 20:14:18 UTC (rev 33)
+@@ -48,8 +48,8 @@
+ 	# Valid content sections
+ 	my @csects = qw/general cache acl settings status/;
+ 
+-	# The admin page is the interface template used when the user is logged in.
+-	$t = Template-&gt;read('admin');
++	# The page used when the user is logged in.
++	$t = Template-&gt;read('user');
+ 
+ 	# Read the template if the sect param is a valid content page.	
+ 	for (@csects) {  if ($sect eq $_) { $c = Template-&gt;read($sect); last; }  }
+
+Modified: trunk/lib/Admin.pm
+===================================================================
+--- trunk/lib/Admin.pm	2007-07-17 19:32:27 UTC (rev 32)
++++ trunk/lib/Admin.pm	2007-07-31 20:14:18 UTC (rev 33)
+@@ -1,16 +1,16 @@
+-package Admin;
++package User;
+ use base 'DBIBase';
+ 
+ use strict;
+ 
+-Admin-&gt;table('admin');
+-Admin-&gt;columns(All =&gt; qw/id user_name pass_word/);
++User-&gt;table('user');
++User-&gt;columns(All =&gt; qw/id user_name pass_word type/);
+ 
+ 
+ sub check{
+ 	shift;
+ 	my ($u, $p) = @_; 
+-	my $it = Admin-&gt;search(user_name =&gt; $u, pass_word =&gt; $p);
++	my $it = User-&gt;search(user_name =&gt; $u, pass_word =&gt; $p);
+ 	return $it-&gt;next-&gt;id if $it;
+ 	Logger-&gt;message(&quot;Check failed with username $u and password (md5) $p&quot;);
+ 	return 0;
+@@ -19,7 +19,7 @@
+ sub change{
+ 	shift;
+ 	my ($id, $p) = @_;
+-	my $a = Admin-&gt;retrieve($id);
++	my $a = User-&gt;retrieve($id);
+ 	$a-&gt;pass_word($p);
+ 	return $a-&gt;update(); 
+ }
+
+Modified: trunk/lib/Logger.pm
+===================================================================
+--- trunk/lib/Logger.pm	2007-07-17 19:32:27 UTC (rev 32)
++++ trunk/lib/Logger.pm	2007-07-31 20:14:18 UTC (rev 33)
+@@ -3,7 +3,7 @@
+ use strict;
+ use Carp;
+ 
+-my $log_dir = &quot;/var/www/html/tentaculo/log&quot;;
++my $log_dir = &quot;log&quot;;
+ 
+ sub message {
+ 	# Writes a message log entry.
+
+Modified: trunk/lib/SessionControl.pm
+===================================================================
+--- trunk/lib/SessionControl.pm	2007-07-17 19:32:27 UTC (rev 32)
++++ trunk/lib/SessionControl.pm	2007-07-31 20:14:18 UTC (rev 33)
+@@ -3,7 +3,7 @@
+ 
+ use strict;
+ use CGI::Session;
+-use Admin;
++use User;
+ use Digest::MD5 'md5_hex';
+ use Logger qw(message error);
+ 
+@@ -52,7 +52,7 @@
+ 	my $self = shift;
+ 	my $ph = shift;
+ 	my ($u, $p) = ($ph-&gt;{'logUser'}, md5_hex($ph-&gt;{'logPass'}) );
+-	my $id = Admin-&gt;check($u,$p);
++	my $id = User-&gt;check($u,$p);
+ 	if ( $id ) {
+ 		$self-&gt;param('logged_in',1);
+ 		$self-&gt;{session}-&gt;expires('logged_in',&quot;+10m&quot;);
+@@ -69,7 +69,7 @@
+ 	my ($o, $n1, $n2 ) = ($ph-&gt;{'oldPass'}, $ph-&gt;{'newPass'}, $ph-&gt;{'newPass2'});
+ 	my ($u, $id) = ( $self-&gt;param('user_name'), $self-&gt;param('user_id') );
+ 
+-	if ( Admin-&gt;check($u, md5_hex($o)) &amp;&amp; ($n1 eq $n2) &amp;&amp; Admin-&gt;change($id, md5_hex($n1)) ){
++	if ( User-&gt;check($u, md5_hex($o)) &amp;&amp; ($n1 eq $n2) &amp;&amp; User-&gt;change($id, md5_hex($n1)) ){
+ 		Logger-&gt;message(&quot;Changed password for user $u&quot;);
+ 		return 1;
+ 	} else { return 0; } 
+
+Modified: trunk/lib/Template.pm
+===================================================================
+--- trunk/lib/Template.pm	2007-07-17 19:32:27 UTC (rev 32)
++++ trunk/lib/Template.pm	2007-07-31 20:14:18 UTC (rev 33)
+@@ -4,11 +4,11 @@
+ use Logger;
+ use I18N;
+ 
+-my $tmpl_dir = &quot;/var/www/html/tentaculo/templates/&quot;;
++my $tmpl_dir = &quot;templates&quot;;
+ 
+-sub read{
++sub read {
+ 	shift;
+-	my $file = $tmpl_dir.I18N-&gt;getLanguage().&quot;/&quot;.shift().&quot;.html&quot;;
++	my $file = $tmpl_dir.&quot;/&quot;.I18N-&gt;getLanguage().&quot;/&quot;.shift().&quot;.html&quot;;
+ 	Logger-&gt;message(&quot;file: $file&quot;);
+ 	open(FILE,&quot;&lt;$file&quot;) or die &quot;Could not open file &quot;.$file.&quot;Error: &quot;.$!;
+ 	my @content=&lt;FILE&gt;;
+
+Deleted: trunk/templates/es/admin.html
+===================================================================
+--- trunk/templates/es/admin.html	2007-07-17 19:32:27 UTC (rev 32)
++++ trunk/templates/es/admin.html	2007-07-31 20:14:18 UTC (rev 33)
+@@ -1,35 +0,0 @@
+-&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Transitional//EN&quot; &quot;<A HREF="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd</A>&quot;&gt;
+-&lt;html xmlns=&quot;<A HREF="http://www.w3.org/1999/xhtml">http://www.w3.org/1999/xhtml</A>&quot;&gt;
+-	&lt;head&gt;
+-		&lt;title&gt;Tentaculo - squid configurator&lt;/title&gt;
+-		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=iso-8859-1&quot; /&gt;
+-		&lt;style type=&quot;text/css&quot; media=&quot;screen&quot;&gt;
+-			&lt;!-- @import url(&quot;elements/css/contents.css&quot;);--&gt;
+-		&lt;/style&gt;
+-	&lt;/head&gt;
+-	&lt;body&gt;
+-		&lt;div id=&quot;page&quot;&gt;
+-			&lt;div id=&quot;title&quot;&gt;
+-				&lt;h1&gt;Sistema de Navegaci&#243;n Controlada&lt;/h1&gt;
+-			&lt;/div&gt;
+-			&lt;div id=&quot;contents&quot;&gt;
+-				&lt;div id=&quot;navigation&quot;&gt;
+-					&lt;ul&gt;
+-						&lt;li&gt;&lt;a href=&quot;index.pl&quot;&gt;Estado&lt;/a&gt;&lt;/li&gt;
+-						&lt;li&gt;&lt;a href=&quot;index.pl?sect=general&quot;&gt;General&lt;/a&gt;&lt;/li&gt;
+-						&lt;li&gt;&lt;a href=&quot;index.pl?sect=cache&quot;&gt;Cache&lt;/a&gt;&lt;/li&gt;
+-						&lt;li&gt;&lt;a href=&quot;index.pl?sect=acl&quot;&gt;ACL&lt;/a&gt;&lt;/li&gt;
+-						&lt;li&gt;&lt;a href=&quot;index.pl?sect=settings&quot;&gt;Preferencias&lt;/a&gt;&lt;/li&gt;
+-						&lt;li&gt;&lt;a href=&quot;index.pl?sect=logout&quot;&gt;Salir&lt;/a&gt;&lt;/li&gt;
+-					&lt;/ul&gt;
+-				&lt;/div&gt;
+-				&lt;div id=&quot;content&quot;&gt;
+-					&lt;!-- CONTENT --&gt;
+-				&lt;/div&gt;
+-			&lt;/div&gt;
+-			&lt;div id=&quot;footer&quot;&gt;
+-				&lt;p&gt;Esta aplicaci&#243;n es Software Libre&lt;/p&gt;
+-			&lt;/div&gt;
+-		&lt;/div&gt;
+-	&lt;/body&gt;
+-&lt;/html&gt;
+
+Modified: trunk/templates/es/login.html
+===================================================================
+--- trunk/templates/es/login.html	2007-07-17 19:32:27 UTC (rev 32)
++++ trunk/templates/es/login.html	2007-07-31 20:14:18 UTC (rev 33)
+@@ -33,7 +33,6 @@
+ 				&lt;/div&gt;
+ 			&lt;/div&gt;
+ 			&lt;div id=&quot;initialFooter&quot;&gt;
+-				&lt;h2&gt;Avatar Ltda.&lt;/h2&gt;
+ 				&lt;p&gt;Esta aplicaci&#243;n es Software Libre - 2005&lt;/p&gt;
+ 			&lt;/div&gt;
+ 		&lt;/div&gt;
+
+Copied: trunk/templates/es/user.html (from rev 32, trunk/templates/es/admin.html)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000030.html">[Tentaculo-svn] r32 - in trunk: . log
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#31">[ date ]</a>
+              <a href="thread.html#31">[ thread ]</a>
+              <a href="subject.html#31">[ subject ]</a>
+              <a href="author.html#31">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

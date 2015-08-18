@@ -1,0 +1,70 @@
+From dasenjo at mail.berlios.de  Tue Aug 28 18:01:46 2007
+From: dasenjo at mail.berlios.de (dasenjo at BerliOS)
+Date: Tue, 28 Aug 2007 18:01:46 +0200
+Subject: [Tentaculo-svn] r34 - in trunk: doc lib
+Message-ID: <200708281601.l7SG1kjl007661@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2007-08-28 18:01:45 +0200 (Tue, 28 Aug 2007)
+New Revision: 34
+
+Added:
+   trunk/lib/User.pm
+Removed:
+   trunk/lib/Admin.pm
+Modified:
+   trunk/doc/CHANGELOG
+Log:
+* Admin.pm changes to User.pm
+
+
+
+Modified: trunk/doc/CHANGELOG
+===================================================================
+--- trunk/doc/CHANGELOG	2007-07-31 20:14:18 UTC (rev 33)
++++ trunk/doc/CHANGELOG	2007-08-28 16:01:45 UTC (rev 34)
+@@ -2,3 +2,6 @@
+ * New CHANGELOG :)
+ * Admin module is now User module.
+ * More simple directories name in Logger and Template modules.
++
++2007-08-28:
++* Admin.pm changes to User.pm
+
+Deleted: trunk/lib/Admin.pm
+===================================================================
+--- trunk/lib/Admin.pm	2007-07-31 20:14:18 UTC (rev 33)
++++ trunk/lib/Admin.pm	2007-08-28 16:01:45 UTC (rev 34)
+@@ -1,27 +0,0 @@
+-package User;
+-use base 'DBIBase';
+-
+-use strict;
+-
+-User->table('user');
+-User->columns(All => qw/id user_name pass_word type/);
+-
+-
+-sub check{
+-	shift;
+-	my ($u, $p) = @_; 
+-	my $it = User->search(user_name => $u, pass_word => $p);
+-	return $it->next->id if $it;
+-	Logger->message("Check failed with username $u and password (md5) $p");
+-	return 0;
+-}
+-
+-sub change{
+-	shift;
+-	my ($id, $p) = @_;
+-	my $a = User->retrieve($id);
+-	$a->pass_word($p);
+-	return $a->update(); 
+-}
+-
+-1;
+
+Copied: trunk/lib/User.pm (from rev 33, trunk/lib/Admin.pm)
+
+
+

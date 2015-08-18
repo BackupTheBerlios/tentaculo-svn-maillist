@@ -1,0 +1,185 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r6 - in trunk: lib templates/es
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-September/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r6%20-%20in%20trunk%3A%20lib%20templates/es&In-Reply-To=%3C200509131553.j8DFrdKk027793%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000003.html">
+   <LINK REL="Next"  HREF="000005.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r6 - in trunk: lib templates/es</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r6%20-%20in%20trunk%3A%20lib%20templates/es&In-Reply-To=%3C200509131553.j8DFrdKk027793%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r6 - in trunk: lib templates/es">dasenjo at berlios.de
+       </A><BR>
+    <I>Tue Sep 13 17:53:39 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000003.html">[Tentaculo-svn] r5 - in trunk: . elements/css lib templates/es
+</A></li>
+        <LI>Next message: <A HREF="000005.html">[Tentaculo-svn] r7 - in trunk: . lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#4">[ date ]</a>
+              <a href="thread.html#4">[ thread ]</a>
+              <a href="subject.html#4">[ subject ]</a>
+              <a href="author.html#4">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-09-13 17:53:39 +0200 (Tue, 13 Sep 2005)
+New Revision: 6
+
+Removed:
+   trunk/templates/es/cache_table_end.html
+Modified:
+   trunk/lib/Cache.pm
+   trunk/templates/es/cache.html
+   trunk/templates/es/cache_table.html
+Log:
+More cache stuff.
+
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-09-13 15:14:22 UTC (rev 5)
++++ trunk/lib/Cache.pm	2005-09-13 15:53:39 UTC (rev 6)
+@@ -62,6 +62,24 @@
+ 	return 0;
+ }
+ 
++sub validateMem{
++	shift;
++	my $ph = shift;
++	my @tags;		# Invalid tags
++
++	# cMem must be an integer (could be in Mb).
++	my $cmem = $ph-&gt;{cMem};
++	push(@tags,'cMem') unless $cmem =~ /^\d+(Mb)?$/;
++
++	return \@tags if @tags;
++	return 0;
++}
++
++sub changeMem{
++	my $self = shift;
++	General-&gt;changeCacheMem(shift);
++}
++
+ sub getPeer{
+ 	my $self = shift;
+ 	return Cache_Peer-&gt;getCachepeer(shift); 
+@@ -89,29 +107,37 @@
+ 
+ sub load{
+ 	shift;
+-	my $c = shift;
++	my ($c,$tags) = @_;
+ 	my $mem = General-&gt;getCacheMem;
+ 	my $cda = Cache_Dir-&gt;getAll;
+ 	$c =~ s/name=&quot;cMem&quot;/name=&quot;cMem&quot; value=&quot;$mem&quot;/ if $mem;
+ 	if ($cda){
++		my $dirs;
+ 		my ($table, $row) = (Template-&gt;read('cache_table'), Template-&gt;read('cache_row'));
+-		foreach my $d (@{$cda}){  $dirs .= &amp;loadCacheRow($dt, $d);  }
+-		#$dirs .= Template-&gt;read('cache_table_end');
+-		$c =~ s/&lt;!-- CACHE_DIRS --&gt;/$dirs/;
++		foreach my $dir (@{$cda}){ $dirs .= &amp;loadCacheRow($row, $dir); }
++		$table =~ s/&lt;!-- CACHE_DIRS --&gt;/$dirs/;
++		$c =~ s/&lt;!-- DIRS_TABLE --&gt;/$table/;
+ 	} else {
+ 		my $no_dir = &quot;&lt;p&gt;&quot;._(&quot;There are not cache directories configured.&quot;).&quot;&lt;/p&gt;&quot;;
+ 		$no_dir .= '&lt;div id=&quot;sectForm&quot;&gt;&lt;p&gt;&lt;a href=&quot;index.pl?sect=cache&amp;sub=dir&amp;act=new&quot;&gt;'._(&quot;Agregar nuevo directorio de Cache&quot;).'&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;';
+ 		$c =~ s/&lt;!-- CACHE_DIRS --&gt;/$no_dir/;
+ 	}
++	if($tags){
++		foreach (@{$tags}){
++			$c =~ s/for=&quot;cMem&quot;/class=&quot;invalid&quot; for=&quot;cMem&quot;/ if $_ eq 'cMem';	
++		}
++			my $m = '&lt;div id=&quot;sectForm&quot;&gt;&lt;p class=&quot;invalid&quot;&gt;'._(&quot;The value entered for the memory is invalid. It have to be an integer (in Kb by default or with an explicit Mb).&quot;).&quot;&lt;/p&gt;&lt;/div&gt;&quot;;
++			$c =~ s/&lt;!-- MESSAGE --&gt;/$m/;
++	}
+ 	return $c;
+ }
+ 
+ sub loadCacheRow{
+-	my ($dt,$d) = @_;
+-	$dt =~ s/ID/$d-&gt;{id}/g;
+-	$dt =~ s/&lt;!-- DIR --&gt;/$d-&gt;{directory}/;
+-	$dt =~ s/&lt;!-- SIZE --&gt;/$d-&gt;{size}/;
+-	return $dt;
++	my ($row,$dir) = @_;
++	$row =~ s/ID/$dir-&gt;{id}/g;
++	$row =~ s/&lt;!-- DIR --&gt;/$dir-&gt;{directory}/;
++	$row =~ s/&lt;!-- SIZE --&gt;/$dir-&gt;{size}/;
++	return $row;
+ }
+ 
+ sub loadCachedir{
+
+Modified: trunk/templates/es/cache.html
+===================================================================
+--- trunk/templates/es/cache.html	2005-09-13 15:14:22 UTC (rev 5)
++++ trunk/templates/es/cache.html	2005-09-13 15:53:39 UTC (rev 6)
+@@ -15,4 +15,5 @@
+ 					&lt;/fieldset&gt;
+ 				&lt;/table&gt;
+ 				&lt;/form&gt;
+-				&lt;!-- CACHE_DIRS --&gt;
++				&lt;!-- MESSAGE --&gt;
++				&lt;!-- DIRS_TABLE --&gt;
+
+Modified: trunk/templates/es/cache_table.html
+===================================================================
+--- trunk/templates/es/cache_table.html	2005-09-13 15:14:22 UTC (rev 5)
++++ trunk/templates/es/cache_table.html	2005-09-13 15:53:39 UTC (rev 6)
+@@ -1,6 +1,6 @@
+ 				&lt;h3&gt;Directorios de Cache&lt;/h3&gt;	
+ 				&lt;table id=&quot;sectForm&quot;&gt;
+ 						&lt;tr&gt;&lt;td&gt;&lt;p class=&quot;theader&quot;&gt;Directorio&lt;/p&gt;&lt;/td&gt;&lt;td&gt;&lt;p class=&quot;theader&quot;&gt;Tama&#241;o&lt;/p&gt;&lt;/td&gt;&lt;/tr&gt;
+-					&lt;!-- ROWS --&gt;
++					&lt;!-- CACHE_DIRS --&gt;
+ 				&lt;/table&gt;
+ 				&lt;div id=&quot;sectForm&quot;&gt;&lt;p&gt;&lt;a href=&quot;index.pl?sect=cache&amp;sub=dir&amp;act=new&quot;&gt;Agregar nuevo directorio de Cache&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;
+
+Deleted: trunk/templates/es/cache_table_end.html
+===================================================================
+--- trunk/templates/es/cache_table_end.html	2005-09-13 15:14:22 UTC (rev 5)
++++ trunk/templates/es/cache_table_end.html	2005-09-13 15:53:39 UTC (rev 6)
+@@ -1,2 +0,0 @@
+-					&lt;/table&gt;
+-					&lt;div id=&quot;sectForm&quot;&gt;&lt;p&gt;&lt;a href=&quot;index.pl?sect=cache&amp;sub=dir&amp;act=new&quot;&gt;Agregar nuevo directorio de Cache&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000003.html">[Tentaculo-svn] r5 - in trunk: . elements/css lib templates/es
+</A></li>
+	<LI>Next message: <A HREF="000005.html">[Tentaculo-svn] r7 - in trunk: . lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#4">[ date ]</a>
+              <a href="thread.html#4">[ thread ]</a>
+              <a href="subject.html#4">[ subject ]</a>
+              <a href="author.html#4">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

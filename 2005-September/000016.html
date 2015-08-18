@@ -1,0 +1,300 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r19 - in trunk: . doc lib
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-September/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r19%20-%20in%20trunk%3A%20.%20doc%20lib&In-Reply-To=%3C200509262125.j8QLPjxd008858%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000015.html">
+   <LINK REL="Next"  HREF="000017.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r19 - in trunk: . doc lib</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r19%20-%20in%20trunk%3A%20.%20doc%20lib&In-Reply-To=%3C200509262125.j8QLPjxd008858%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r19 - in trunk: . doc lib">dasenjo at berlios.de
+       </A><BR>
+    <I>Mon Sep 26 23:25:45 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000015.html">[Tentaculo-svn] r18 - trunk/elements
+</A></li>
+        <LI>Next message: <A HREF="000017.html">[Tentaculo-svn] r20 - in trunk: . lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#16">[ date ]</a>
+              <a href="thread.html#16">[ thread ]</a>
+              <a href="subject.html#16">[ subject ]</a>
+              <a href="author.html#16">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-09-26 23:25:44 +0200 (Mon, 26 Sep 2005)
+New Revision: 19
+
+Modified:
+   trunk/doc/INSTALL
+   trunk/index.pl
+   trunk/lib/Cache.pm
+   trunk/lib/SquidControl.pm
+   trunk/lib/Status.pm
+   trunk/sec.pl
+Log:
+The configuration file is writed in etc.
+
+
+
+Modified: trunk/doc/INSTALL
+===================================================================
+--- trunk/doc/INSTALL	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/doc/INSTALL	2005-09-26 21:25:44 UTC (rev 19)
+@@ -7,7 +7,7 @@
+   webserver. Change the group that own the files by the webserver group and give 
+   write privileges to it (You need root privileges to execute these operations.):
+   
+-  # chgrp www-data/*; chmod g+w log/*
++  # chgrp www-data log/*; chmod g+w log/*
+ 
+   www-data is the default webserver groupname in Debian, the groupname depends on
+   each distribution.
+@@ -15,7 +15,8 @@
+ * Copy the contents of the misc/apache.conf in the apache configuration file. 
+   The file is based on Debian defaults. Change /var/www to your DocumentRoot.
+   You can add an 'Include /path/to/tentaculo/misc/apache.conf' line in the apache
+-  configuration file too.
++  configuration file too. You can also copy the apache.conf file as tentaculo.conf 
++  in the /etc/apache/conf.d/ directory.
+ 
+ * Import the default database from misc/tentaculo.sql into a mysql 4.0 server and 
+   create an account with all data privileges (Select, Insert, Update and Delete) 
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/index.pl	2005-09-26 21:25:44 UTC (rev 19)
+@@ -18,8 +18,10 @@
+ use SessionControl;
+ use Logger;
+ use Template;
++use SquidControl;
+ my $sc = SessionControl-&gt;new($cgi);
+ $sc-&gt;startSession();		# Start a new session or recover an started one.
++my $squc = SquidControl-&gt;new();
+ 
+ # Per-section modules and their objects.
+ use General;
+@@ -55,7 +57,7 @@
+ 		#-- Status section --#
+ 		my $s = $sc-&gt;param(&quot;status&quot;);
+ 		print $cgi-&gt;redirect(&quot;sec.pl?act=status&quot;) unless $s;
+-		$c = $stat-&gt;load($c, $s);
++		$c = $stat-&gt;load($c, $s) if $s;
+ 		$sc-&gt;clear(&quot;status&quot;);		# clear the status param in the session.
+ 	} elsif ( $sect eq 'general' ) {
+ 		#-- General section --#
+@@ -114,7 +116,7 @@
+ 		# The user is trying to log in.
+ 		if ( $sc-&gt;check($phr) ) {
+ 			# The user logged in.
+-			print $cgi-&gt;redirect(&quot;index.pl&quot;);
++			print $cgi-&gt;redirect('index.pl');
+ 		} else {
+ 			# The user failed trying to log in.
+ 			$t = Template-&gt;read('login');
+@@ -126,9 +128,9 @@
+ 	}
+ } 
+ 
+-$t =~ s/&lt;!-- CONTENT --&gt;/$c/ if $t;
++# Write the configuration file locally.
++$squc-&gt;writeFile();
+ 
+-print $cgi-&gt;header(-cookie=&gt;$sc-&gt;cookie); 
+-print $t if $t;
+-
+-Logger-&gt;error(&quot;There is no page to print!\n&quot;) unless $t;
++# Replace the content in the template and print it if exists, else log an error.
++$t =~ s/&lt;!-- CONTENT --&gt;/$c/ if ($t &amp;&amp; $c);
++print $cgi-&gt;header(-cookie=&gt;$sc-&gt;cookie),$t if $t; 
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/lib/Cache.pm	2005-09-26 21:25:44 UTC (rev 19)
+@@ -96,7 +96,7 @@
+ 
+ 	# cMem must be an integer (could be in Mb).
+ 	my $cmem = $ph-&gt;{cMem};
+-	push(@tags,'cMem') unless $cmem =~ /^\d+(Mb)?$/;
++	push(@tags,'cMem') unless $cmem =~ /^\d+( MB)?$/;
+ 
+ 	return \@tags if @tags;
+ 	return 0;
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/lib/SquidControl.pm	2005-09-26 21:25:44 UTC (rev 19)
+@@ -15,10 +15,7 @@
+ 
+ sub writeFile{
+ 	shift;
+-	my $cont;		# The squid.conf file content
+-	$cont .= &amp;header();
+-	$cont .= &amp;general();
+-	$cont .= &amp;cache();
++	my $cont = &amp;header().&amp;general().&amp;cache().&amp;acl();
+ 	open(FILE,&quot;&gt;etc/squid.conf&quot;) or die &quot;Error: &quot;.$!;
+ 	print FILE $cont;
+ 	close(FILE);
+@@ -26,7 +23,7 @@
+ 
+ sub header {
+ 	shift;
+-	return 	&quot;# File created by nc. Creation date: &quot;.localtime().&quot;\n&quot;.
++	return 	&quot;# Created by tentaculo at &quot;.localtime().&quot;.\n&quot;.
+ 		&quot;#############################################################\n&quot;.
+ 		&quot;#############################################################\n\n&quot;;
+ }
+@@ -38,19 +35,18 @@
+ 	$ret .= &quot;# -----------------------------------------------------------\n&quot;;
+ 	$ret .= &quot;#############################################################\n\n&quot;;
+ 	$g = General-&gt;getGeneral();
+-	foreach my $tag (@tags){  $ret .= &amp;simpleTag($tag, $g-&gt;{$tag});  }
++	foreach my $tag (@tags){  $ret .= &amp;simpleTag($tag, $g-&gt;{$tag}) if $g-&gt;{$tag}; }
+ 	return $ret;
+ }
+ 
+ sub cache {
+ 	shift;
+-	# hierarchy_stoplist and no_cache are squid recommended
+ 	my ($ret, $g);
+ 	$ret  =	&quot;# CACHE OPTIONS\n&quot;;
+ 	$ret .= &quot;# -----------------------------------------------------------\n&quot;;
+ 	$ret .= &quot;#############################################################\n\n&quot;;
+ 	$ret .= &amp;simpleTag('cache_mem', General-&gt;getCacheMem());
+-	# The following two tags are squid recomended
++	# hierarchy_stoplist and no_cache configurations are squid recommended
+ 	$ret .= &amp;simpleTag('hierarchy_stoplist', 'cgi-bin ?');
+ 	$ret .=	&quot;#  TAG: no_cache\n&quot;;
+ 	$ret .= &quot;# -----------------------------------------------------------\n&quot;;
+@@ -58,16 +54,47 @@
+ 	$ret .= &quot;no_cache deny QUERY\n\n&quot;;
+ 	
+ 	# Write a tag for each cache dir entrie.
+-	foreach (@{Cache_Dir-&gt;getAll}){  $ret .= &amp;cacheDirTag($_-&gt;{directory}, $_-&gt;{size});  }
++	my $dirs = Cache_Dir-&gt;getAll();
++	if($dirs){ for (@{$dirs}){ $ret .= &amp;cacheDirTag($_-&gt;{directory}, $_-&gt;{size}); } }
+ 	return $ret;
+ }
+ 
++sub acl {
++	shift;
++	my $ret;
++	$ret  =	&quot;# ACCESS CONTROL\n&quot;;
++	$ret .= &quot;# -----------------------------------------------------------\n&quot;;
++	$ret .= &quot;#############################################################\n\n&quot;;
++	# Default values. Squid recommended.
++	$ret .= &quot;acl all src 0.0.0.0/0.0.0.0\n&quot;;
++	$ret .= &quot;acl manager proto cache_object\n&quot;;
++	$ret .= &quot;acl localhost src 127.0.0.1/255.255.255.255\n&quot;;
++	$ret .= &quot;acl to_localhost dst 127.0.0.0/8\n&quot;;
++	$ret .= &quot;acl SSL_ports port 443 563	# https, snews\n&quot;;
++	$ret .= &quot;acl SSL_ports port 873		# rsync\n&quot;;
++	$ret .= &quot;acl Safe_ports port 80		# http\n&quot;;
++	$ret .= &quot;acl Safe_ports port 21		# ftp\n&quot;;
++	$ret .= &quot;acl Safe_ports port 443 563	# https, snews\n&quot;;
++	$ret .= &quot;acl Safe_ports port 70		# gopher\n&quot;;
++	$ret .= &quot;acl Safe_ports port 210		# wais\n&quot;;
++	$ret .= &quot;acl Safe_ports port 1025-65535	# unregistered ports\n&quot;;
++	$ret .= &quot;acl Safe_ports port 280		# http-mgmt\n&quot;;
++	$ret .= &quot;acl Safe_ports port 488		# gss-http\n&quot;;
++	$ret .= &quot;acl Safe_ports port 591		# filemaker\n&quot;;
++	$ret .= &quot;acl Safe_ports port 777		# multiling http\n&quot;;
++	$ret .= &quot;acl Safe_ports port 631		# cups\n&quot;;
++	$ret .= &quot;acl Safe_ports port 873		# rsync\n&quot;;
++	$ret .= &quot;acl Safe_ports port 901		# SWAT\n&quot;;
++	$ret .= &quot;acl purge method PURGE\n&quot;;
++	$ret .= &quot;acl CONNECT method CONNECT\n&quot;;
++}
++
+ sub simpleTag {
+ 	my $ret;
+ 	my ($tag, $value) = @_;
+ 	$ret  =	&quot;#  TAG: $tag\n&quot;;
+ 	$ret .= &quot;# -----------------------------------------------------------\n&quot;;
+-	$ret .= &quot;$tag = $value\n\n&quot;;
++	$ret .= &quot;$tag $value\n\n&quot;;
+ 	return $ret;
+ }
+ 
+@@ -80,9 +107,4 @@
+ 	return $ret;
+ }
+ 
+-sub isRunning{
+-	shift;
+-	open(SQ,&quot;&lt;/var/run/squid.conf&quot;);
+-	my $pid = &lt;SQ&gt;;
+-}
+ 1;
+
+Modified: trunk/lib/Status.pm
+===================================================================
+--- trunk/lib/Status.pm	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/lib/Status.pm	2005-09-26 21:25:44 UTC (rev 19)
+@@ -18,8 +18,6 @@
+ 	my $sys = $s-&gt;{sys} ? _(&quot;controlling squid&quot;) : _(&quot;not controlling squid&quot;);
+ 	$c =~ s/&lt;!-- SYS-STATUS --&gt;/$sys/;
+ 
+-	$c =~ s/&lt;!-- CHANGES --&gt;/$s-&gt;{changes}/ if $s-&gt;{changes};
+-
+ 	my $squ = $s-&gt;{squ} ? _(&quot;running&quot;) : _(&quot;stopped&quot;);
+ 	$c =~ s/&lt;!-- SQ-STATUS --&gt;/$squ/;
+ 
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/sec.pl	2005-09-26 21:25:44 UTC (rev 19)
+@@ -20,6 +20,8 @@
+ 	my $uid = POSIX::getuid();
+ 	my $act = $cgi-&gt;url_param('act');
+ 
++	Logger-&gt;message(&quot;Called sec.pl&quot;);
++
+ 	if($act &amp;&amp; $act eq 'status'){
+ 		my $s = { sys =&gt; 0, cha =&gt; 0, squ =&gt; 0};
+ 		&amp;getRoot() or Logger-&gt;error(&quot;Can't get root privileges&quot;);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000015.html">[Tentaculo-svn] r18 - trunk/elements
+</A></li>
+	<LI>Next message: <A HREF="000017.html">[Tentaculo-svn] r20 - in trunk: . lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#16">[ date ]</a>
+              <a href="thread.html#16">[ thread ]</a>
+              <a href="subject.html#16">[ subject ]</a>
+              <a href="author.html#16">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

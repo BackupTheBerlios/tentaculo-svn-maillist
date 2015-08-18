@@ -1,0 +1,267 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r21 - in trunk: . lib templates/es
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-September/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r21%20-%20in%20trunk%3A%20.%20lib%20templates/es&In-Reply-To=%3C200509292322.j8TNMVxw016095%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000017.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r21 - in trunk: . lib templates/es</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r21%20-%20in%20trunk%3A%20.%20lib%20templates/es&In-Reply-To=%3C200509292322.j8TNMVxw016095%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r21 - in trunk: . lib templates/es">dasenjo at berlios.de
+       </A><BR>
+    <I>Fri Sep 30 01:22:31 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000017.html">[Tentaculo-svn] r20 - in trunk: . lib templates/es
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#18">[ date ]</a>
+              <a href="thread.html#18">[ thread ]</a>
+              <a href="subject.html#18">[ subject ]</a>
+              <a href="author.html#18">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-09-30 01:22:27 +0200 (Fri, 30 Sep 2005)
+New Revision: 21
+
+Modified:
+   trunk/index.pl
+   trunk/lib/Cache_Dir.pm
+   trunk/lib/SquidControl.pm
+   trunk/lib/Status.pm
+   trunk/sec.pl
+   trunk/templates/es/status.html
+Log:
+* The squid interaction squid is usable. The system copies the conf file
+  and reload/start squid.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/index.pl	2005-09-29 23:22:27 UTC (rev 21)
+@@ -57,9 +57,10 @@
+ 		#-- Status section --#
+ 		if(!$act){
+ 			my $s = $sc-&gt;param(&quot;status&quot;);
++			my $r = $sc-&gt;param(&quot;restart&quot;);
+ 			print $cgi-&gt;redirect(&quot;sec.pl?act=status&quot;) unless $s;
+-			$c = $stat-&gt;load($c, $s) if $s;
+-			$sc-&gt;clear(&quot;status&quot;);		# clear the status param in the session.
++			$c = $stat-&gt;load($c, $s, $r) if $s;
++			$sc-&gt;clear([&quot;status&quot;]); # clear session params 
+ 		} elsif( $act eq 'restart'){
+ 			print $cgi-&gt;redirect(&quot;sec.pl?act=restart&quot;);
+ 		}
+@@ -133,7 +134,6 @@
+ } 
+ 
+ # Write the configuration file locally.
+-Logger-&gt;message(&quot;changed: &quot;.$gen-&gt;isChanged());
+ $squc-&gt;writeFile() if $gen-&gt;isChanged() == 1;
+ 
+ # Replace the content in the template and print it if exists, else log an error.
+
+Modified: trunk/lib/Cache_Dir.pm
+===================================================================
+--- trunk/lib/Cache_Dir.pm	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/lib/Cache_Dir.pm	2005-09-29 23:22:27 UTC (rev 21)
+@@ -3,6 +3,7 @@
+ 
+ use strict;
+ use Logger;
++use General;
+ 
+ Cache_Dir-&gt;table('cache_dir');
+ Cache_Dir-&gt;columns(All =&gt; qw/id directory size/);
+@@ -29,7 +30,7 @@
+ 	my $cd = Cache_Dir-&gt;retrieve($ph-&gt;{cID});
+ 	$cd-&gt;directory($ph-&gt;{cDir}) if $cd;
+ 	$cd-&gt;size($ph-&gt;{cSize}) if $cd;
+-	return $cd-&gt;update if $cd;
++	return $cd-&gt;update if ($cd &amp;&amp; General-&gt;isChanged(1));
+ 	return 0;
+ }
+ 
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/lib/SquidControl.pm	2005-09-29 23:22:27 UTC (rev 21)
+@@ -15,7 +15,7 @@
+ 
+ sub writeFile{
+ 	shift;
+-	my $cont = &amp;header().&amp;general().&amp;cache().&amp;acl();
++	my $cont = &amp;header().&amp;general().&amp;cache().&amp;acl().&amp;http_access();
+ 	open(FILE,&quot;&gt;etc/squid.conf&quot;) or die &quot;Error: &quot;.$!;
+ 	print FILE $cont;
+ 	close(FILE);
+@@ -50,6 +50,7 @@
+ 	# hierarchy_stoplist and no_cache configurations are squid recommended
+ 	$ret .= &amp;simpleTag('hierarchy_stoplist', 'cgi-bin ?');
+ 	$ret .=	&quot;#  TAG: no_cache\n&quot;;
++	$ret .=	&quot;#  (squid recommended)\n&quot;;
+ 	$ret .= &quot;# -----------------------------------------------------------\n&quot;;
+ 	$ret .= 'acl QUERY urlpath_regex cgi-bin \?'.&quot;\n&quot;;
+ 	$ret .= &quot;no_cache deny QUERY\n\n&quot;;
+@@ -90,6 +91,25 @@
+ 	$ret .= &quot;acl CONNECT method CONNECT\n&quot;;
+ }
+ 
++sub http_access {
++	shift;
++	my $ret;
++	# Only allow cachemgr access from localhost
++	$ret .= &quot;http_access allow manager localhost\n&quot;;
++	$ret .= &quot;http_access deny manager\n&quot;;
++	# Only allow purge requests from localhost
++	$ret .= &quot;http_access allow purge localhost\n&quot;;
++	$ret .= &quot;http_access deny purge\n&quot;;
++	$ret .= &quot;# Deny requests to unknown ports\n&quot;;
++	$ret .= &quot;http_access deny !Safe_ports\n&quot;;
++	# Deny CONNECT to other than SSL ports
++	$ret .= &quot;http_access deny CONNECT !SSL_ports\n&quot;;
++	# INSERT YOUR OWN RULE(S) HERE TO ALLOW ACCESS FROM YOUR CLIENTS
++	$ret .= &quot;http_access allow localhost\n&quot;;
++	# And finally deny all other access to this proxy
++	$ret .= &quot;http_access deny all\n&quot;;
++	return $ret;
++}
+ sub simpleTag {
+ 	my $ret;
+ 	my ($tag, $value) = @_;
+
+Modified: trunk/lib/Status.pm
+===================================================================
+--- trunk/lib/Status.pm	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/lib/Status.pm	2005-09-29 23:22:27 UTC (rev 21)
+@@ -13,7 +13,7 @@
+ 
+ sub load{
+ 	shift;
+-	my ($c, $s) = @_;
++	my ($c, $s, $r) = @_;
+ 
+ 	my $sys = $s-&gt;{sys} ? _(&quot;controlling squid&quot;) : _(&quot;not controlling squid&quot;);
+ 	$c =~ s/&lt;!-- SYS-STATUS --&gt;/$sys/;
+@@ -21,9 +21,7 @@
+ 	my $squ = $s-&gt;{squ} ? _(&quot;running&quot;) : _(&quot;stopped&quot;);
+ 	$c =~ s/&lt;!-- SQ-STATUS --&gt;/$squ/;
+ 	
+-	my $res = 	&quot;&lt;a href=index.pl?sect=status&amp;act=restart&gt;&quot;.
+-			_(&quot;Restart squid and aply the changes.&quot;).&quot;&lt;/a&gt;&quot;;
+-	$c =~ s/&lt;!-- RESTART --&gt;/$res/ if ($s-&gt;{sys} || $s-&gt;{squ});
++	$c =~ s/&lt;!-- RESTART --&gt;/$r/ if $r;
+ 
+ 	return $c;
+ }
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/sec.pl	2005-09-29 23:22:27 UTC (rev 21)
+@@ -15,29 +15,32 @@
+ my $cgi = new CGI;
+ my $sc = SessionControl-&gt;new($cgi);
+ $sc-&gt;startSession();		# Start a new session or recover an started one.
++my $scf = &quot;/etc/squid/squid.conf&quot;;
+ 
+ if ( $sc-&gt;isLoggedIn() ){
+ 	my $uid = POSIX::getuid();
+ 	my $act = $cgi-&gt;url_param('act');
++	my $stat = $sc-&gt;param('status');
+ 
+-	Logger-&gt;message(&quot;Called sec.pl&quot;);
+-
+ 	if($act &amp;&amp; $act eq 'status'){
+-		my $s = { sys =&gt; 0, cha =&gt; 0, squ =&gt; 0};
++		my $s = { sys =&gt; 0, squ =&gt; 0};
+ 		&amp;getRoot() or Logger-&gt;error(&quot;Can't get root privileges&quot;);
+-
+ 		# Compare the files to check if the system is controlling squid.
+-		$s-&gt;{sys} = 1 unless `diff etc/squid.conf /etc/squid/squid.conf`;
+-
++		$s-&gt;{sys} = 1 unless `diff etc/squid.conf $scf`;
+ 		# Is squid running?
+ 		$s-&gt;{squ} = 1 if `pgrep squid`;
+-
+-		POSIX::setuid($uid); 		# Hold privileges.
++		&amp;holdRoot($uid) or die &quot;Can't hold root privilegs&quot;;
+ 		$sc-&gt;param('status', $s);
+ 	} elsif($act &amp;&amp; $act eq 'restart') {
+ 		&amp;getRoot() or Logger-&gt;error(&quot;Can't get root privileges&quot;);
+-		my $res = `cp etc/squid.conf /etc/squid; /etc/init.d/squid restart`;
+-		Logger-&gt;message(&quot;Restart result: &quot;.$res);
++		# Make a backup the first time.
++		`cp $scf $scf.tent` if (-e $scf &amp;&amp; !-e $scf.&quot;tent&quot;);
++		# An easy way: copy the configuration file and reload/start squid.
++		my $res = `cp -v etc/squid.conf $scf;`;
++		if ($stat &amp;&amp; $stat-&gt;{squ}){ $res .= `squid -k reconfigure`; } # running, just reload
++		else {  $res .= `/etc/init.d/squid start`; }
++		&amp;holdRoot($uid) or die &quot;Can't hold root privileges&quot;;
++		Logger-&gt;message(&quot;Restarting squid result: $res&quot;);
+ 		$sc-&gt;param('restart', $res);
+ 	}
+ } else {
+@@ -55,3 +58,10 @@
+ 	return 0;
+ }
+ 
++sub holdRoot{
++	shift;
++	my $uid = shift;
++	POSIX::setuid($uid);
++	return 1 if POSIX::getuid() == $uid;
++	return 0;
++}
+
+Modified: trunk/templates/es/status.html
+===================================================================
+--- trunk/templates/es/status.html	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/templates/es/status.html	2005-09-29 23:22:27 UTC (rev 21)
+@@ -2,5 +2,5 @@
+ 					&lt;p&gt;Bienvenido al Sistema de Navegaci&#243;n Controlada.&lt;/p&gt;
+ 					&lt;p&gt;El sistema est&#225; &lt;!-- SYS-STATUS --&gt;.&lt;/p&gt;
+ 					&lt;p&gt;Squid est&#225; &lt;!-- SQ-STATUS --&gt;.&lt;/p&gt;
++					&lt;p&gt;&lt;a href=index.pl?sect=status&amp;act=restart&gt;Restart squid and aply the changes&lt;/a&gt;&lt;/p&gt;
+ 					&lt;p&gt;&lt;!-- RESTART --&gt;&lt;/p&gt;
+-					&lt;p&gt;&lt;!-- RESULT --&gt;&lt;/p&gt;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000017.html">[Tentaculo-svn] r20 - in trunk: . lib templates/es
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#18">[ date ]</a>
+              <a href="thread.html#18">[ thread ]</a>
+              <a href="subject.html#18">[ subject ]</a>
+              <a href="author.html#18">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,310 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r26 - in trunk: . lib templates/es
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-October/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r26%20-%20in%20trunk%3A%20.%20lib%20templates/es&In-Reply-To=%3C200510042155.j94Ltlax011063%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000023.html">
+   <LINK REL="Next"  HREF="000025.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r26 - in trunk: . lib templates/es</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r26%20-%20in%20trunk%3A%20.%20lib%20templates/es&In-Reply-To=%3C200510042155.j94Ltlax011063%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r26 - in trunk: . lib templates/es">dasenjo at berlios.de
+       </A><BR>
+    <I>Tue Oct  4 23:55:47 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000023.html">[Tentaculo-svn] r25 - in trunk: lib misc templates/es
+</A></li>
+        <LI>Next message: <A HREF="000025.html">[Tentaculo-svn] r27 - in trunk: . lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#24">[ date ]</a>
+              <a href="thread.html#24">[ thread ]</a>
+              <a href="subject.html#24">[ subject ]</a>
+              <a href="author.html#24">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-10-04 23:55:46 +0200 (Tue, 04 Oct 2005)
+New Revision: 26
+
+Added:
+   trunk/lib/Acl.pm
+   trunk/templates/es/acl.html
+   trunk/templates/es/acl_row.html
+Modified:
+   trunk/index.pl
+   trunk/lib/Cache.pm
+   trunk/lib/SquidControl.pm
+   trunk/templates/es/admin.html
+Log:
+ACLs support.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/index.pl	2005-10-04 21:55:46 UTC (rev 26)
+@@ -26,9 +26,11 @@
+ # Per-section modules and their objects.
+ use General;
+ use Cache;
++use Acl;
+ use Status;
+ my $gen = General-&gt;new();
+ my $cach = Cache-&gt;new();
++my $acl = Acl-&gt;new();
+ my $stat = Status-&gt;new();
+ 
+ # HTML Page variables. t = template. c = content (or template fill).
+@@ -44,7 +46,7 @@
+ 	Logger-&gt;message(&quot;index.pl vars sect: $sect sub: $sub act: $act&quot;);
+ 	
+ 	# Valid content sections
+-	my @csects = qw/general cache settings status/;
++	my @csects = qw/general cache acl settings status/;
+ 
+ 	# The admin page is the interface template used when the user is logged in.
+ 	$t = Template-&gt;read('admin');
+@@ -102,6 +104,9 @@
+ 				$c = $cach-&gt;result($cach-&gt;delDir($id)) if $id;
+ 			}
+ 		}
++	} elsif ( $sect eq 'acl' ) {
++		#-- Status section --#
++		$c = $acl-&gt;load($c) unless $act;
+ 	} elsif ( $sect eq 'settings' ) {
+ 		#-- Settings section --#
+ 		if($sub eq 'password'){
+
+Added: trunk/lib/Acl.pm
+===================================================================
+--- trunk/lib/Acl.pm	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/lib/Acl.pm	2005-10-04 21:55:46 UTC (rev 26)
+@@ -0,0 +1,97 @@
++package Acl;
++use base 'DBIBase';
++
++use strict;
++use Logger;
++use General;
++
++Acl-&gt;table('acl');
++Acl-&gt;columns(All =&gt; qw/id name acltype aclstring/);
++
++sub new{
++	my $this = shift;
++	my $class = ref($this) || $this;
++	my $self = {};
++	bless($self,$class);
++	return $self;
++}
++
++sub getAll{
++	shift;
++	my @acls;
++	foreach my $d (Acl-&gt;retrieve_all){
++		push @acls, { 	id =&gt; $d-&gt;id, 
++				name =&gt; $d-&gt;name, 
++				acltype =&gt; $d-&gt;acltype, 
++				aclstring =&gt; $d-&gt;aclstring, 
++		};
++	}
++	return \@acls if @acls;
++	return 0;
++}
++
++sub getAcl{
++	shift;
++	my $d = Acl-&gt;retrieve(shift);
++	return{	id =&gt; $d-&gt;id,
++		name =&gt; $d-&gt;name, 
++		acltype =&gt; $d-&gt;acltype, 
++		aclstring =&gt; $d-&gt;aclstring, 
++	};
++}
++
++sub changeAcl{
++	shift;
++	my $ph = shift;
++	my $cd = Acl-&gt;retrieve($ph-&gt;{cID});
++	$cd-&gt;name($ph-&gt;{cDir}) if $cd;
++	$cd-&gt;acltype($ph-&gt;{cSize}) if $cd;
++	return $cd-&gt;update if ($cd &amp;&amp; General-&gt;isChanged(1) &amp;&amp; !General-&gt;isSwapCreated(0));
++	return 0;
++}
++
++sub addAcl{
++	shift;
++	my $ph = shift;
++	my $cd = Acl-&gt;create({
++		name =&gt; $ph-&gt;{cDir},
++		acltype =&gt; $ph-&gt;{cSize},
++	});
++	return $cd if ($cd &amp;&amp; General-&gt;isChanged(1) &amp;&amp; !General-&gt;isSwapCreated(0));
++	return 0;
++}
++
++sub delAcl{
++	shift;
++	my $d = Acl-&gt;retrieve(shift);
++	return $d-&gt;delete() if ($d &amp;&amp; General-&gt;isChanged(1) &amp;&amp; !General-&gt;isSwapCreated(0));
++	return 0;
++}
++
++sub load{
++	shift;
++	my ($c, $tags) = @_;
++	my $aa = Acl-&gt;getAll;
++
++	if ($aa){
++		my $acls;
++		my $row = Template-&gt;read('acl_row');
++		foreach my $acl (@{$aa}){ $acls .= &amp;loadRow($row, $acl); }
++		$c =~ s/&lt;!-- ACLS --&gt;/$acls/;
++	} else {
++		my $no_acl = _(&quot;There are not ACLs configured.&quot;);
++		$c =~ s/&lt;!-- NO_ACL --&gt;/$no_acl/;
++	}
++	return $c;
++}
++
++sub loadRow{
++	my ($row,$acl) = @_;
++	$row =~ s/ID/$acl-&gt;{id}/g;
++	$row =~ s/&lt;!-- NAME --&gt;/$acl-&gt;{name}/;
++	$row =~ s/&lt;!-- ACLTYPE --&gt;/$acl-&gt;{acltype}/;
++	$row =~ s/&lt;!-- ACLSTRING --&gt;/$acl-&gt;{aclstring}/;
++	return $row;
++}
++
++1;
+
+
+Property changes on: trunk/lib/Acl.pm
+___________________________________________________________________
+Name: svn:executable
+   + *
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/lib/Cache.pm	2005-10-04 21:55:46 UTC (rev 26)
+@@ -139,8 +139,9 @@
+ sub loadCacheRow{
+ 	my ($row,$dir) = @_;
+ 	$row =~ s/ID/$dir-&gt;{id}/g;
+-	$row =~ s/&lt;!-- DIR --&gt;/$dir-&gt;{directory}/;
+-	$row =~ s/&lt;!-- SIZE --&gt;/$dir-&gt;{size}/;
++	$row =~ s/&lt;!-- NAME --&gt;/$dir-&gt;{name}/;
++	$row =~ s/&lt;!-- ACLTYPE --&gt;/$dir-&gt;{acltype}/;
++	$row =~ s/&lt;!-- ACLSTRING --&gt;/$dir-&gt;{aclstring}/;
+ 	return $row;
+ }
+ 
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/lib/SquidControl.pm	2005-10-04 21:55:46 UTC (rev 26)
+@@ -68,10 +68,7 @@
+ 	$ret .= &quot;# -----------------------------------------------------------\n&quot;;
+ 	$ret .= &quot;#############################################################\n\n&quot;;
+ 	# Default values. Squid recommended.
+-	$ret .= &quot;acl all src 0.0.0.0/0.0.0.0\n&quot;;
+ 	$ret .= &quot;acl manager proto cache_object\n&quot;;
+-	$ret .= &quot;acl localhost src 127.0.0.1/255.255.255.255\n&quot;;
+-	$ret .= &quot;acl to_localhost dst 127.0.0.0/8\n&quot;;
+ 	$ret .= &quot;acl SSL_ports port 443 563	# https, snews\n&quot;;
+ 	$ret .= &quot;acl SSL_ports port 873		# rsync\n&quot;;
+ 	$ret .= &quot;acl Safe_ports port 80		# http\n&quot;;
+@@ -89,6 +86,10 @@
+ 	$ret .= &quot;acl Safe_ports port 901		# SWAT\n&quot;;
+ 	$ret .= &quot;acl purge method PURGE\n&quot;;
+ 	$ret .= &quot;acl CONNECT method CONNECT\n&quot;;
++	# Write a tag for each cache dir entrie.
++	my $acls = Acl-&gt;getAll();
++	if($acls){ for(@{$acls}){$ret .=&quot;acl &quot;.$_-&gt;{name}.&quot; &quot;.$_-&gt;{acltype}.&quot; &quot;.$_-&gt;{aclstring}; }}
++	return $ret;
+ }
+ 
+ sub http_access {
+
+Added: trunk/templates/es/acl.html
+===================================================================
+--- trunk/templates/es/acl.html	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/templates/es/acl.html	2005-10-04 21:55:46 UTC (rev 26)
+@@ -0,0 +1,11 @@
++&lt;h1&gt;Listas de Control de Acceso&lt;/h1&gt;
++				&lt;table id=&quot;sectForm&quot;&gt;
++					&lt;tr&gt;
++					&lt;td&gt;&lt;p class=&quot;theader&quot;&gt;Nombre&lt;/p&gt;&lt;/td&gt;
++					&lt;td&gt;&lt;p class=&quot;theader&quot;&gt;Tipo&lt;/p&gt;&lt;/td&gt;
++					&lt;td&gt;&lt;p class=&quot;theader&quot;&gt;Cadena&lt;/p&gt;&lt;/td&gt;
++					&lt;/tr&gt;
++					&lt;!-- ACLS --&gt;
++				&lt;/table&gt;
++				&lt;div id=&quot;sectForm&quot;&gt;&lt;p&gt;&lt;!-- NO_ACL --&gt;&lt;/p&gt;&lt;/div&gt;
++				&lt;div id=&quot;sectForm&quot;&gt;&lt;p&gt;&lt;a href=&quot;index.pl?sect=acl&amp;act=new&quot;&gt;Agregar nueva ACL&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;
+
+Added: trunk/templates/es/acl_row.html
+===================================================================
+--- trunk/templates/es/acl_row.html	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/templates/es/acl_row.html	2005-10-04 21:55:46 UTC (rev 26)
+@@ -0,0 +1,7 @@
++						&lt;tr&gt;
++						&lt;td&gt;&lt;p&gt;&lt;!-- NAME --&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;td&gt;&lt;p&gt;&lt;!-- ACLTYPE --&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;td&gt;&lt;p&gt;&lt;!-- ACLSTRING --&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;td&gt;&lt;p&gt;&lt;a href=&quot;index.pl?sect=acl&amp;act=change&amp;id=ID&quot;&gt;Cambiar&lt;/a&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;td&gt;&lt;p&gt;&lt;a href=&quot;index.pl?sect=acl&amp;act=del&amp;id=ID&quot;&gt;Eliminar&lt;/a&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;/tr&gt;
+
+Modified: trunk/templates/es/admin.html
+===================================================================
+--- trunk/templates/es/admin.html	2005-10-03 22:43:12 UTC (rev 25)
++++ trunk/templates/es/admin.html	2005-10-04 21:55:46 UTC (rev 26)
+@@ -18,6 +18,7 @@
+ 						&lt;li&gt;&lt;a href=&quot;index.pl&quot;&gt;Estado&lt;/a&gt;&lt;/li&gt;
+ 						&lt;li&gt;&lt;a href=&quot;index.pl?sect=general&quot;&gt;General&lt;/a&gt;&lt;/li&gt;
+ 						&lt;li&gt;&lt;a href=&quot;index.pl?sect=cache&quot;&gt;Cache&lt;/a&gt;&lt;/li&gt;
++						&lt;li&gt;&lt;a href=&quot;index.pl?sect=acl&quot;&gt;ACL&lt;/a&gt;&lt;/li&gt;
+ 						&lt;li&gt;&lt;a href=&quot;index.pl?sect=settings&quot;&gt;Preferencias&lt;/a&gt;&lt;/li&gt;
+ 						&lt;li&gt;&lt;a href=&quot;index.pl?sect=logout&quot;&gt;Salir&lt;/a&gt;&lt;/li&gt;
+ 					&lt;/ul&gt;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000023.html">[Tentaculo-svn] r25 - in trunk: lib misc templates/es
+</A></li>
+	<LI>Next message: <A HREF="000025.html">[Tentaculo-svn] r27 - in trunk: . lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#24">[ date ]</a>
+              <a href="thread.html#24">[ thread ]</a>
+              <a href="subject.html#24">[ subject ]</a>
+              <a href="author.html#24">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,544 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r5 - in trunk: . elements/css lib templates/es
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-September/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r5%20-%20in%20trunk%3A%20.%20elements/css%20lib%20templates/es&In-Reply-To=%3C200509131514.j8DFEMFt024332%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000002.html">
+   <LINK REL="Next"  HREF="000004.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r5 - in trunk: . elements/css lib templates/es</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r5%20-%20in%20trunk%3A%20.%20elements/css%20lib%20templates/es&In-Reply-To=%3C200509131514.j8DFEMFt024332%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r5 - in trunk: . elements/css lib templates/es">dasenjo at berlios.de
+       </A><BR>
+    <I>Tue Sep 13 17:14:22 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000002.html">[Tentaculo-svn] Test mail
+</A></li>
+        <LI>Next message: <A HREF="000004.html">[Tentaculo-svn] r6 - in trunk: lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#3">[ date ]</a>
+              <a href="thread.html#3">[ thread ]</a>
+              <a href="subject.html#3">[ subject ]</a>
+              <a href="author.html#3">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-09-13 17:14:22 +0200 (Tue, 13 Sep 2005)
+New Revision: 5
+
+Added:
+   trunk/lib/Cache.pm
+   trunk/lib/Cache_Peer.pm
+Removed:
+   trunk/lib/CacheControl.pm
+Modified:
+   trunk/elements/css/contents.css
+   trunk/index.pl
+   trunk/lib/Cache_Dir.pm
+   trunk/lib/General.pm
+   trunk/lib/Template.pm
+   trunk/templates/es/cache_table.html
+   trunk/templates/es/newCachedir.html
+Log:
+The Cache module is now like the General one.
+
+
+Modified: trunk/elements/css/contents.css
+===================================================================
+--- trunk/elements/css/contents.css	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/elements/css/contents.css	2005-09-13 15:14:22 UTC (rev 5)
+@@ -94,7 +94,7 @@
+ 				#content h3
+ 				{
+ 					width:80px;
+-					margin:5px 15px 15px 350px;
++					margin:5px 15px 15px 15px;
+ 					padding:0;
+ 					font-size:12px;
+ 					color:#666666;
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/index.pl	2005-09-13 15:14:22 UTC (rev 5)
+@@ -23,9 +23,9 @@
+ 
+ # Per-section modules and their objects.
+ use General;
+-use CacheControl;
++use Cache;
+ my $gen = General-&gt;new();
+-my $cc = CacheControl-&gt;new();
++my $cach = Cache-&gt;new();
+ 
+ # HTML Page variables. t = template. c = content (or template fill).
+ my ($t,$c);
+@@ -37,7 +37,7 @@
+ 	my $sub = $phr-&gt;{'sub'} || $cgi-&gt;url_param('sub') || '';
+ 	my $act = $phr-&gt;{'act'} || $cgi-&gt;url_param('act') || '';
+ 
+-	#Logger-&gt;message(&quot;index.pl vars sect: $sect sub: $sub act: $act&quot;);
++	Logger-&gt;message(&quot;index.pl vars sect: $sect sub: $sub act: $act&quot;);
+ 	
+ 	# Valid content sections
+ 	my @csects = qw/general cache settings status/;
+@@ -62,8 +62,6 @@
+ 		$c = $gen-&gt;load($c) unless $act;
+ 		if ( $act eq 'change' ){
+ 			my $err = $gen-&gt;validate($phr);
+-			#$c = Template-&gt;result($gen-&gt;change($phr), $sect) unless $err;
+-			#Logger-&gt;error(&quot;Hay errores en general&quot;) if $err;
+ 			$c = $gen-&gt;result($gen-&gt;change($phr)) unless $err;
+ 			$c = $gen-&gt;load($c, $err) if $err;
+ 		}
+@@ -74,23 +72,27 @@
+ 			if ( $act eq 'view' ) {
+ 				$c = Template-&gt;read('cachedir');
+ 				my $id = $cgi-&gt;url_param('id');
+-				$c = Template-&gt;loadCachedir($c, $cc-&gt;getDir($id)) if $id;
++				$c = Template-&gt;loadCachedir($c, $cach-&gt;getDir($id)) if $id;
+ 			} elsif ( $act eq 'change' ) {
+-				$c = Template-&gt;result($cc-&gt;changeDir($phr), $sect);
++				$c = Template-&gt;result($cach-&gt;changeDir($phr), $sect);
+ 			} elsif ( $act eq 'new' ) {
+-				$c = Template-&gt;read('newCachedir');
++				$c = $cach-&gt;newDir() 
+ 			} elsif ( $act eq 'add' ) {
+-				$c = Template-&gt;result($cc-&gt;addDir($phr), $sect);
++				my $err = $cach-&gt;validateDir($phr);
++				$c = $cach-&gt;result($cach-&gt;addDir($phr)) unless $err;
++				$c = $cach-&gt;newDir($err) if $err;
+ 			} elsif ( $act eq 'del' ) {
+ 				my $id = $cgi-&gt;url_param('id');
+-				$c = Template-&gt;result($cc-&gt;delDir($id), $sect) if $id;
++				$c = Template-&gt;result($cach-&gt;delDir($id), $sect) if $id;
+ 			}
+ 		} elsif ( !$sub ) {
++			$c = $cach-&gt;load($c) unless $act;
+ 			if ( $act eq 'change' ){
+-				$c = Template-&gt;result($cc-&gt;changeMem($phr), $sect);
++				my $err = $cach-&gt;validateMem($phr);
++				$c = $cach-&gt;result($cach-&gt;changeMem($phr)) unless $err;
++				$c = $cach-&gt;load($c, $err) if $err;
+ 			}
+-			$c = Template-&gt;loadCache($c, $cc-&gt;getMem(), $cc-&gt;getDirs());
+-		} else {  Logger-&gt;error('Wrong subsection in Cache.')  }
++		}
+ 	} elsif ( $sect eq 'settings' ) {
+ 		#-- Settings section --#
+ 		if($sub eq 'password'){
+
+Copied: trunk/lib/Cache.pm (from rev 3, trunk/lib/CacheControl.pm)
+===================================================================
+--- trunk/lib/CacheControl.pm	2005-09-09 15:13:47 UTC (rev 3)
++++ trunk/lib/Cache.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -0,0 +1,145 @@
++package Cache;
++
++use strict;
++use Logger;
++use Template;
++use General;
++use Cache_Dir;
++use Cache_Peer;
++
++sub new{
++	my $this = shift;
++	my $class = ref($this) || $this;
++	my $self = {};
++	bless($self,$class);
++	return $self;
++}
++
++sub changeDir{
++	my $self = shift;
++	Cache_Dir-&gt;changeCachedir(shift);
++}
++
++sub addDir{
++	my $self = shift;
++	return Cache_Dir-&gt;addCachedir(shift);
++}
++
++sub delDir{
++	my $self = shift;
++	Cache_Dir-&gt;delCachedir(shift);
++}
++
++sub newDir{
++	my ($self, $tags) = @_;
++	my $c = Template-&gt;read('newCachedir');
++	if ($tags){
++		my $m = _(&quot;There was errrors validating the data for the new cache directory.&quot;);
++		foreach (@{$tags}){
++			$m .= _(&quot; The entered path seems to be wrong.&quot;) if $_ eq 'cDir';	
++			$m .= _(&quot; The entered size seems to be wrong.&quot;) if $_ eq 'cSize';	
++		}
++		$c =~ s/&lt;!-- MESSAGE --&gt;/$m/;
++	}
++	return $c;
++}
++
++sub validateDir{
++	shift;
++	my $ph = shift;
++	my @tags;		# Invalid tags
++
++	# cDir must be a valid system directory.
++	push(@tags,'cDir') unless -d $ph-&gt;{cDir};
++
++	# cSize must be an integer.
++	my $csize = $ph-&gt;{cSize};
++	push(@tags,'cSize') unless $csize =~ /^\d+$/;
++	
++	# TODO: cDir must be empty and its filesystem must have cSize free bytes.
++
++	return \@tags if @tags;
++	return 0;
++}
++
++sub getPeer{
++	my $self = shift;
++	return Cache_Peer-&gt;getCachepeer(shift); 
++}
++
++sub getPeers{
++	my $self = shift;
++	return Cache_Peer-&gt;getAll(); 
++}
++
++sub changePeer{
++	my $self = shift;
++	Cache_Peer-&gt;changeCachepeer(shift);
++}
++
++sub addPeer{
++	my $self = shift;
++	return Cache_Peer-&gt;addCachepeer(shift);
++}
++
++sub delPeer{
++	my $self = shift;
++	Cache_Peer-&gt;delCachepeer(shift);
++}
++
++sub load{
++	shift;
++	my $c = shift;
++	my $mem = General-&gt;getCacheMem;
++	my $cda = Cache_Dir-&gt;getAll;
++	$c =~ s/name=&quot;cMem&quot;/name=&quot;cMem&quot; value=&quot;$mem&quot;/ if $mem;
++	if ($cda){
++		my ($table, $row) = (Template-&gt;read('cache_table'), Template-&gt;read('cache_row'));
++		foreach my $d (@{$cda}){  $dirs .= &amp;loadCacheRow($dt, $d);  }
++		#$dirs .= Template-&gt;read('cache_table_end');
++		$c =~ s/&lt;!-- CACHE_DIRS --&gt;/$dirs/;
++	} else {
++		my $no_dir = &quot;&lt;p&gt;&quot;._(&quot;There are not cache directories configured.&quot;).&quot;&lt;/p&gt;&quot;;
++		$no_dir .= '&lt;div id=&quot;sectForm&quot;&gt;&lt;p&gt;&lt;a href=&quot;index.pl?sect=cache&amp;sub=dir&amp;act=new&quot;&gt;'._(&quot;Agregar nuevo directorio de Cache&quot;).'&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;';
++		$c =~ s/&lt;!-- CACHE_DIRS --&gt;/$no_dir/;
++	}
++	return $c;
++}
++
++sub loadCacheRow{
++	my ($dt,$d) = @_;
++	$dt =~ s/ID/$d-&gt;{id}/g;
++	$dt =~ s/&lt;!-- DIR --&gt;/$d-&gt;{directory}/;
++	$dt =~ s/&lt;!-- SIZE --&gt;/$d-&gt;{size}/;
++	return $dt;
++}
++
++sub loadCachedir{
++	shift;
++	my ($c,$d) = @_;
++	$c =~ s/name=&quot;cID&quot;/name=&quot;cID&quot; value=&quot;$d-&gt;{id}&quot;/ if $d-&gt;{id};
++	$c =~ s/name=&quot;cDir&quot;/name=&quot;cDir&quot; value=&quot;$d-&gt;{directory}&quot;/ if $d-&gt;{directory};
++	$c =~ s/name=&quot;cSize&quot;/name=&quot;cSize&quot; value=&quot;$d-&gt;{size}&quot;/ if $d-&gt;{size};
++	return $c;
++}
++
++sub result{
++	shift;
++	my ($r, $sub) = @_;
++	my ($t, $m);
++	my $res = Template-&gt;read('result');
++	if ($r){ 
++		$t = _('Successful change'); 
++		$m = _('The Cache Configuration has been changed successfully.');
++	} else { 
++		$t = _('Unsuccessful change'); 
++		$m = _('There was a problem trying to apply the changes. Please try again.')
++	}
++	$res =~ s/&lt;!-- TITLE --&gt;/$t/;
++	$res =~ s/&lt;!-- MESSAGE --&gt;/$m/;
++	$res =~ s/SECTION/cache/g;
++	return $res;
++}
++
++
++1;
+
+Deleted: trunk/lib/CacheControl.pm
+===================================================================
+--- trunk/lib/CacheControl.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/CacheControl.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -1,50 +0,0 @@
+-package CacheControl;
+-
+-use strict;
+-use General;
+-use Cache_Dir;
+-
+-sub new{
+-	my $this = shift;
+-	my $class = ref($this) || $this;
+-	my $self = {};
+-	bless($self,$class);
+-	return $self;
+-}
+-
+-sub getMem{
+-	my $self = shift;
+-	return General-&gt;getCacheMem(); 
+-}
+-
+-sub getDirs{
+-	my $self = shift;
+-	return Cache_Dir-&gt;getAll(); 
+-}
+-
+-sub changeMem{
+-	my $self = shift;
+-	return General-&gt;changeCacheMem(shift);
+-}
+-
+-sub getDir{
+-	my $self = shift;
+-	return Cache_Dir-&gt;getCachedir(shift); 
+-}
+-
+-sub changeDir{
+-	my $self = shift;
+-	Cache_Dir-&gt;changeCachedir(shift);
+-}
+-
+-sub addDir{
+-	my $self = shift;
+-	return Cache_Dir-&gt;addCachedir(shift);
+-}
+-
+-sub delDir{
+-	my $self = shift;
+-	Cache_Dir-&gt;delCachedir(shift);
+-}
+-
+-1;
+
+Modified: trunk/lib/Cache_Dir.pm
+===================================================================
+--- trunk/lib/Cache_Dir.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/Cache_Dir.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -11,9 +11,10 @@
+ 	shift;
+ 	my @dirs;
+ 	foreach my $d (Cache_Dir-&gt;retrieve_all){
+-		push @dirs, {id =&gt; $d-&gt;id, directory =&gt; $d-&gt;directory, size =&gt; $d-&gt;size};
++		push @dirs, { id =&gt; $d-&gt;id, directory =&gt; $d-&gt;directory, size =&gt; $d-&gt;size, };
+ 	}
+-	return \@dirs;
++	return \@dirs if @dirs;
++	return 0;
+ }
+ 
+ sub getCachedir{
+
+Added: trunk/lib/Cache_Peer.pm
+===================================================================
+--- trunk/lib/Cache_Peer.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/Cache_Peer.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -0,0 +1,49 @@
++package Cache_Peer;
++use base 'DBIBase';
++
++use strict;
++use Logger;
++
++Cache_Peer-&gt;table('cache_peer');
++Cache_Peer-&gt;columns(All =&gt; qw/id address http_port icp_port/);
++
++sub getAll{
++	shift;
++	my @peers;
++	foreach my $p (Cache_Peer-&gt;retrieve_all){
++		push @peers, { id =&gt; $p-&gt;id, address =&gt; $p-&gt;directory, http_port =&gt; $p-&gt;http_port, cp_port =&gt; $p-&gt;icp_port, };
++	}
++	return \@peers;
++}
++
++sub getCachepeer{
++	shift;
++	my $p = Cache_Peer-&gt;retrieve(shift);
++	return { id =&gt; $p-&gt;id, address =&gt; $p-&gt;directory, http_port =&gt; $p-&gt;http_port, cp_port =&gt; $p-&gt;icp_port, } if $p;
++}
++
++sub changeCachedir{
++	shift;
++	my $ph = shift;
++	my $cd = Cache_Peer-&gt;retrieve($ph-&gt;{cID});
++	$cd-&gt;directory($ph-&gt;{cPeer});
++	$cd-&gt;size($ph-&gt;{cSize});
++	return $cd-&gt;update;
++}
++
++sub addCachedir{
++	shift;
++	my $ph = shift;
++	return Cache_Peer-&gt;create({
++		directory =&gt; $ph-&gt;{cPeer},
++		size =&gt; $ph-&gt;{cSize},
++	});
++}
++
++sub delCachedir{
++	shift;
++	my $p = Cache_Peer-&gt;retrieve(shift);
++	return $p-&gt;delete() if $p;
++}
++
++1;
+
+
+Property changes on: trunk/lib/Cache_Peer.pm
+___________________________________________________________________
+Name: svn:executable
+   + *
+
+Modified: trunk/lib/General.pm
+===================================================================
+--- trunk/lib/General.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/General.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -127,7 +127,7 @@
+ 	my $res = Template-&gt;read('result');
+ 	if ($r){ 
+ 		$t = _('Successful change'); 
+-		$m = _('The General Configuration has been changed successfully.');
++		$m = _('The general configuration has been changed successfully.');
+ 	} else { 
+ 		$t = _('Unsuccessful change'); 
+ 		$m = _('There was a problem trying to apply the changes. Please try again.')
+
+Modified: trunk/lib/Template.pm
+===================================================================
+--- trunk/lib/Template.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/Template.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -41,49 +41,6 @@
+ 	$res =~ s/SECTION/$sect/g;
+ 	return $res;
+ }
+-
+-sub loadGeneral{
+-	shift;
+-	my ($c,$s) = @_;
+-	$c =~ s/name=&quot;gEnable&quot;/name=&quot;gEnable&quot; checked=&quot;checked&quot;/ if $s-&gt;{enable};
+-	$c =~ s/name=&quot;gHPort&quot;/name=&quot;gHPort&quot; value=&quot;$s-&gt;{http_port}&quot;/ if $s-&gt;{http_port};
+-	$c =~ s/name=&quot;gName&quot;/name=&quot;gName&quot; value=&quot;$s-&gt;{visible_hostname}&quot;/ if $s-&gt;{visible_hostname};
+-	$c =~ s/name=&quot;gDomain&quot;/name=&quot;gDomain&quot; value=&quot;$s-&gt;{append_domain}&quot;/ if $s-&gt;{append_domain};
+-	$c =~ s/name=&quot;gIPort&quot;/name=&quot;gIPort&quot; value=&quot;$s-&gt;{icp_port}&quot;/ if $s-&gt;{icp_port};
+-	return $c;
+-}
+-
+-sub loadCache{
+-	shift;
+-	my ($c,$mem,$cda) = @_;		# $cda = cache dirs array
+-	$c =~ s/name=&quot;cMem&quot;/name=&quot;cMem&quot; value=&quot;$mem&quot;/ if $mem;
+-	if ($cda){
+-		my ($dirs, $dt) = (Template-&gt;read('cache_table'), Template-&gt;read('cache_row'));
+-		foreach my $d (@{$cda}){  $dirs .= Template-&gt;loadCacheRow($dt, $d);  }
+-		$dirs .= Template-&gt;read('cache_table_end');
+-		$c =~ s/&lt;!-- CACHE_DIRS --&gt;/$dirs/;
+-	}
+-	return $c;
+-}
+-
+-sub loadCacheRow{
+-	shift;
+-	my ($dt,$d) = @_;
+-	$dt =~ s/ID/$d-&gt;{id}/g;
+-	$dt =~ s/&lt;!-- DIR --&gt;/$d-&gt;{directory}/;
+-	$dt =~ s/&lt;!-- SIZE --&gt;/$d-&gt;{size}/;
+-	return $dt;
+-}
+-
+-sub loadCachedir{
+-	shift;
+-	my ($c,$d) = @_;
+-	$c =~ s/name=&quot;cID&quot;/name=&quot;cID&quot; value=&quot;$d-&gt;{id}&quot;/ if $d-&gt;{id};
+-	$c =~ s/name=&quot;cDir&quot;/name=&quot;cDir&quot; value=&quot;$d-&gt;{directory}&quot;/ if $d-&gt;{directory};
+-	$c =~ s/name=&quot;cSize&quot;/name=&quot;cSize&quot; value=&quot;$d-&gt;{size}&quot;/ if $d-&gt;{size};
+-	return $c;
+-}
+-
+ sub loginError{
+ 	shift;
+ 	my $p = shift;
+
+Modified: trunk/templates/es/cache_table.html
+===================================================================
+--- trunk/templates/es/cache_table.html	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/templates/es/cache_table.html	2005-09-13 15:14:22 UTC (rev 5)
+@@ -1,2 +1,6 @@
++				&lt;h3&gt;Directorios de Cache&lt;/h3&gt;	
+ 				&lt;table id=&quot;sectForm&quot;&gt;
+ 						&lt;tr&gt;&lt;td&gt;&lt;p class=&quot;theader&quot;&gt;Directorio&lt;/p&gt;&lt;/td&gt;&lt;td&gt;&lt;p class=&quot;theader&quot;&gt;Tama&#241;o&lt;/p&gt;&lt;/td&gt;&lt;/tr&gt;
++					&lt;!-- ROWS --&gt;
++				&lt;/table&gt;
++				&lt;div id=&quot;sectForm&quot;&gt;&lt;p&gt;&lt;a href=&quot;index.pl?sect=cache&amp;sub=dir&amp;act=new&quot;&gt;Agregar nuevo directorio de Cache&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;
+
+Modified: trunk/templates/es/newCachedir.html
+===================================================================
+--- trunk/templates/es/newCachedir.html	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/templates/es/newCachedir.html	2005-09-13 15:14:22 UTC (rev 5)
+@@ -20,3 +20,4 @@
+ 						&lt;/fieldset&gt;
+ 					&lt;/table&gt;
+ 					&lt;/form&gt;
++					&lt;!-- MESSAGE --&gt;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000002.html">[Tentaculo-svn] Test mail
+</A></li>
+	<LI>Next message: <A HREF="000004.html">[Tentaculo-svn] r6 - in trunk: lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#3">[ date ]</a>
+              <a href="thread.html#3">[ thread ]</a>
+              <a href="subject.html#3">[ subject ]</a>
+              <a href="author.html#3">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r25 - in trunk: lib misc templates/es
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-October/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r25%20-%20in%20trunk%3A%20lib%20misc%20templates/es&In-Reply-To=%3C200510032243.j93MhDUY022677%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000022.html">
+   <LINK REL="Next"  HREF="000024.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r25 - in trunk: lib misc templates/es</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r25%20-%20in%20trunk%3A%20lib%20misc%20templates/es&In-Reply-To=%3C200510032243.j93MhDUY022677%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r25 - in trunk: lib misc templates/es">dasenjo at berlios.de
+       </A><BR>
+    <I>Tue Oct  4 00:43:13 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000022.html">[Tentaculo-svn] r24 - trunk
+</A></li>
+        <LI>Next message: <A HREF="000024.html">[Tentaculo-svn] r26 - in trunk: . lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#23">[ date ]</a>
+              <a href="thread.html#23">[ thread ]</a>
+              <a href="subject.html#23">[ subject ]</a>
+              <a href="author.html#23">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-10-04 00:43:12 +0200 (Tue, 04 Oct 2005)
+New Revision: 25
+
+Modified:
+   trunk/lib/General.pm
+   trunk/misc/tentaculo.sql
+   trunk/templates/es/general.html
+Log:
+Dropped enable. The system is always enabled.
+
+
+Modified: trunk/lib/General.pm
+===================================================================
+--- trunk/lib/General.pm	2005-10-03 22:36:49 UTC (rev 24)
++++ trunk/lib/General.pm	2005-10-03 22:43:12 UTC (rev 25)
+@@ -7,7 +7,7 @@
+ use Data::Types qw(:int);
+ 
+ General-&gt;table('general');
+-General-&gt;columns(All =&gt; qw/id enable changed swap http_port visible_hostname append_domain icp_port cache_mem/);
++General-&gt;columns(All =&gt; qw/id changed swap http_port visible_hostname append_domain icp_port cache_mem/);
+ 
+ sub new{
+ 	my $this = shift;
+@@ -21,7 +21,6 @@
+ 	shift;
+ 	my $g = General-&gt;retrieve(1);
+ 	return {
+-		enable		 =&gt; 	$g-&gt;enable,
+ 		http_port 	 =&gt; 	$g-&gt;http_port,
+ 		visible_hostname =&gt;	$g-&gt;visible_hostname,
+ 		append_domain	 =&gt;	$g-&gt;append_domain,
+@@ -40,7 +39,6 @@
+ 	my $ph = shift;
+ 	my $g = General-&gt;retrieve(1);
+ 	if ($g){
+-		$g-&gt;enable($ph-&gt;{gEnable});
+ 		$g-&gt;http_port($ph-&gt;{gHPort});
+ 		$g-&gt;visible_hostname($ph-&gt;{gName});
+ 		$g-&gt;append_domain($ph-&gt;{gDomain});
+@@ -121,7 +119,6 @@
+ 	shift;
+ 	my ($c,$tags) = @_;
+ 	my $s = &amp;getGeneral();
+-	$c =~ s/name=&quot;gEnable&quot;/name=&quot;gEnable&quot; checked=&quot;checked&quot;/ if $s-&gt;{enable};
+ 	$c =~ s/name=&quot;gHPort&quot;/name=&quot;gHPort&quot; value=&quot;$s-&gt;{http_port}&quot;/ if $s-&gt;{http_port};
+ 	$c =~ s/name=&quot;gIPort&quot;/name=&quot;gIPort&quot; value=&quot;$s-&gt;{icp_port}&quot;/ if $s-&gt;{icp_port};
+ 	$c =~ s/name=&quot;gName&quot;/name=&quot;gName&quot; value=&quot;$s-&gt;{visible_hostname}&quot;/ if $s-&gt;{visible_hostname};
+
+Modified: trunk/misc/tentaculo.sql
+===================================================================
+--- trunk/misc/tentaculo.sql	2005-10-03 22:36:49 UTC (rev 24)
++++ trunk/misc/tentaculo.sql	2005-10-03 22:43:12 UTC (rev 25)
+@@ -107,7 +107,6 @@
+ 
+ CREATE TABLE general (
+   id int(11) NOT NULL default '1',
+-  enable tinyint(1) NOT NULL default '0',
+   changed tinyint(1) NOT NULL default '0',
+   swap tinyint(1) NOT NULL default '0',
+   http_port smallint(5) unsigned NOT NULL default '3128',
+@@ -122,4 +121,4 @@
+ -- Data for table `general`
+ -- 
+ 
+-INSERT INTO general VALUES (1, 0, 0, 0, 3128, 3130, NULL, NULL, '8M');
++INSERT INTO general VALUES (1, 0, 0, 3128, 3130, NULL, NULL, '8M');
+
+Modified: trunk/templates/es/general.html
+===================================================================
+--- trunk/templates/es/general.html	2005-10-03 22:36:49 UTC (rev 24)
++++ trunk/templates/es/general.html	2005-10-03 22:43:12 UTC (rev 25)
+@@ -3,10 +3,6 @@
+ 						&lt;table id=&quot;sectForm&quot;&gt;
+ 						&lt;fieldset&gt;
+ 							&lt;tr&gt;
+-							&lt;td&gt;&lt;p&gt;&lt;label for=&quot;gEnable&quot;&gt;Activar sistema&lt;/label&gt;&lt;/p&gt;&lt;/td&gt;
+-							&lt;td&gt;&lt;p&gt;&lt;input type=&quot;checkbox&quot; name=&quot;gEnable&quot; id=&quot;gEnable&quot; class=&quot;check&quot; value=&quot;1&quot;/&gt;&lt;/p&gt;&lt;/td&gt;
+-							&lt;/tr&gt;
+-							&lt;tr&gt;
+ 							&lt;td&gt;&lt;p&gt;&lt;label for=&quot;gHPort&quot;&gt;Puerto HTTP&lt;/label&gt;&lt;/p&gt;&lt;/td&gt;
+ 							&lt;td&gt;&lt;p&gt;&lt;input type=&quot;text&quot; maxlength=&quot;5&quot; name=&quot;gHPort&quot; id=&quot;gHPort&quot;/&gt;&lt;/p&gt;&lt;/td&gt;
+ 							&lt;/tr&gt;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000022.html">[Tentaculo-svn] r24 - trunk
+</A></li>
+	<LI>Next message: <A HREF="000024.html">[Tentaculo-svn] r26 - in trunk: . lib templates/es
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#23">[ date ]</a>
+              <a href="thread.html#23">[ thread ]</a>
+              <a href="subject.html#23">[ subject ]</a>
+              <a href="author.html#23">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

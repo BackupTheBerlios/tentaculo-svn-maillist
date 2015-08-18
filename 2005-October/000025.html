@@ -1,0 +1,326 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r27 - in trunk: . lib templates/es
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-October/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r27%20-%20in%20trunk%3A%20.%20lib%20templates/es&In-Reply-To=%3C200510051627.j95GR9Mp007453%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000024.html">
+   <LINK REL="Next"  HREF="000026.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r27 - in trunk: . lib templates/es</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r27%20-%20in%20trunk%3A%20.%20lib%20templates/es&In-Reply-To=%3C200510051627.j95GR9Mp007453%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r27 - in trunk: . lib templates/es">dasenjo at berlios.de
+       </A><BR>
+    <I>Wed Oct  5 18:27:09 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000024.html">[Tentaculo-svn] r26 - in trunk: . lib templates/es
+</A></li>
+        <LI>Next message: <A HREF="000026.html">[Tentaculo-svn] r28 - trunk/lib
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#25">[ date ]</a>
+              <a href="thread.html#25">[ thread ]</a>
+              <a href="subject.html#25">[ subject ]</a>
+              <a href="author.html#25">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-10-05 18:27:08 +0200 (Wed, 05 Oct 2005)
+New Revision: 27
+
+Added:
+   trunk/templates/es/newAcl.html
+Modified:
+   trunk/index.pl
+   trunk/lib/Acl.pm
+   trunk/lib/Cache.pm
+   trunk/lib/SquidControl.pm
+   trunk/sec.pl
+Log:
+Bug fixes and more on acls.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/index.pl	2005-10-05 16:27:08 UTC (rev 27)
+@@ -107,6 +107,13 @@
+ 	} elsif ( $sect eq 'acl' ) {
+ 		#-- Status section --#
+ 		$c = $acl-&gt;load($c) unless $act;
++		if ( $act eq 'new' ){
++			$c = $acl-&gt;newAcl();
++		} elsif ( $act eq 'add'){
++			my $err = $acl-&gt;validateAcl($phr);
++			$c = $acl-&gt;result($acl-&gt;addAcl($phr)) unless $err;
++			$c = $acl-&gt;newAcl($err) if $err;
++		}
+ 	} elsif ( $sect eq 'settings' ) {
+ 		#-- Settings section --#
+ 		if($sub eq 'password'){
+
+Modified: trunk/lib/Acl.pm
+===================================================================
+--- trunk/lib/Acl.pm	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/lib/Acl.pm	2005-10-05 16:27:08 UTC (rev 27)
+@@ -32,32 +32,35 @@
+ 
+ sub getAcl{
+ 	shift;
+-	my $d = Acl-&gt;retrieve(shift);
+-	return{	id =&gt; $d-&gt;id,
+-		name =&gt; $d-&gt;name, 
+-		acltype =&gt; $d-&gt;acltype, 
+-		aclstring =&gt; $d-&gt;aclstring, 
+-	};
++	my $a = Acl-&gt;retrieve(shift);
++	return{	id =&gt; $a-&gt;id,
++		name =&gt; $a-&gt;name, 
++		acltype =&gt; $a-&gt;acltype, 
++		aclstring =&gt; $a-&gt;aclstring, 
++	} if $a;
++	return 0;
+ }
+ 
+ sub changeAcl{
+ 	shift;
+ 	my $ph = shift;
+-	my $cd = Acl-&gt;retrieve($ph-&gt;{cID});
+-	$cd-&gt;name($ph-&gt;{cDir}) if $cd;
+-	$cd-&gt;acltype($ph-&gt;{cSize}) if $cd;
+-	return $cd-&gt;update if ($cd &amp;&amp; General-&gt;isChanged(1) &amp;&amp; !General-&gt;isSwapCreated(0));
++	my $dir = Acl-&gt;retrieve($ph-&gt;{cID});
++	$dir-&gt;name($ph-&gt;{aName}) if $dir;
++	$dir-&gt;acltype($ph-&gt;{aType}) if $dir;
++	$dir-&gt;aclstring($ph-&gt;{aString}) if $dir;
++	return $dir-&gt;update if ($dir &amp;&amp; General-&gt;isChanged(1));
+ 	return 0;
+ }
+ 
+ sub addAcl{
+ 	shift;
+ 	my $ph = shift;
+-	my $cd = Acl-&gt;create({
+-		name =&gt; $ph-&gt;{cDir},
+-		acltype =&gt; $ph-&gt;{cSize},
++	my $acl = Acl-&gt;create({
++		name =&gt; $ph-&gt;{aName},
++		acltype =&gt; $ph-&gt;{aType},
++		aclstring =&gt; $ph-&gt;{aString},
+ 	});
+-	return $cd if ($cd &amp;&amp; General-&gt;isChanged(1) &amp;&amp; !General-&gt;isSwapCreated(0));
++	return $acl if ( $acl &amp;&amp; General-&gt;isChanged(1) );
+ 	return 0;
+ }
+ 
+@@ -94,4 +97,59 @@
+ 	return $row;
+ }
+ 
++sub newAcl{
++	my ($self, $tags) = @_;
++	my $c = Template-&gt;read('newAcl');
++	if ($tags){
++		my $m = _(&quot;There was errrors validating the data for the new cache directory.&quot;);
++		foreach (@{$tags}){
++			$m .= _(&quot; The entered name seems to be wrong.&quot;) if $_ eq 'aName';	
++			$m .= _(&quot; The entered type seems to be wrong.&quot;) if $_ eq 'aType';	
++			$m .= _(&quot; The entered string seems to be wrong.&quot;) if $_ eq 'aString';	
++		}
++		$c =~ s/&lt;!-- MESSAGE --&gt;/$m/;
++	}
++	return $c;
++}
++
++sub result{
++	shift;
++	my $r = @_;
++	my ($t, $m);
++	my $res = Template-&gt;read('result');
++	if ($r){ 
++		$t = _('Successful change'); 
++		$m = _('The ACL Configuration has been changed successfully.');
++	} else { 
++		$t = _('Unsuccessful change'); 
++		$m = _('There was a problem trying to apply the changes. Please try again.')
++	}
++	$res =~ s/&lt;!-- TITLE --&gt;/$t/;
++	$res =~ s/&lt;!-- MESSAGE --&gt;/$m/;
++	$res =~ s/SECTION/acl/g;
++	return $res;
++}
++
++sub validateAcl{
++	shift;
++	my $ph = shift;
++	my @tags;		# Invalid tags
++
++	# The name must be a word.
++	push(@tags,'aName') unless $ph-&gt;{aName} =~ /\w/;
++
++	# The type must be one of src, dst, port or proto.
++	push(@tags,'aType') unless $ph-&gt;{aType} =~ /src|dst|port|proto/;
++
++	# The string depends on the type.
++	if($ph-&gt;{aType} eq 'src' or $ph-&gt;{aType} eq 'dst'){
++	my $regexp =    '^((\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.){3}
++			(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$';
++		push(@tags,'aString') unless $ph-&gt;{aString} =~ /$regexp/x;
++	}
++
++	return \@tags if @tags;
++	return 0;
++}
++
+ 1;
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/lib/Cache.pm	2005-10-05 16:27:08 UTC (rev 27)
+@@ -139,9 +139,8 @@
+ sub loadCacheRow{
+ 	my ($row,$dir) = @_;
+ 	$row =~ s/ID/$dir-&gt;{id}/g;
+-	$row =~ s/&lt;!-- NAME --&gt;/$dir-&gt;{name}/;
+-	$row =~ s/&lt;!-- ACLTYPE --&gt;/$dir-&gt;{acltype}/;
+-	$row =~ s/&lt;!-- ACLSTRING --&gt;/$dir-&gt;{aclstring}/;
++	$row =~ s/&lt;!-- DIR --&gt;/$dir-&gt;{directory}/;
++	$row =~ s/&lt;!-- SIZE --&gt;/$dir-&gt;{size}/;
+ 	return $row;
+ }
+ 
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/lib/SquidControl.pm	2005-10-05 16:27:08 UTC (rev 27)
+@@ -31,11 +31,13 @@
+ 
+ sub general {
+ 	shift;
+-	my ($ret, $g, @tags) = ('', '', ('http_port','icp_port', 'visible_hostname'));
++	my ($ret, $g);
++	my @tags = ('http_port', 'icp_port', 'visible_hostname', 'append_domain');
+ 	$ret  =	&quot;# GENERAL OPTIONS\n&quot;;
+ 	$ret .= &quot;# -----------------------------------------------------------\n&quot;;
+ 	$ret .= &quot;#############################################################\n\n&quot;;
+ 	$g = General-&gt;getGeneral();
++	$g-&gt;{append_domain} = &quot;.&quot;.$g-&gt;{append_domain};
+ 	foreach my $tag (@tags){  $ret .= &amp;simpleTag($tag, $g-&gt;{$tag}) if $g-&gt;{$tag}; }
+ 	return $ret;
+ }
+@@ -88,7 +90,7 @@
+ 	$ret .= &quot;acl CONNECT method CONNECT\n&quot;;
+ 	# Write a tag for each cache dir entrie.
+ 	my $acls = Acl-&gt;getAll();
+-	if($acls){ for(@{$acls}){$ret .=&quot;acl &quot;.$_-&gt;{name}.&quot; &quot;.$_-&gt;{acltype}.&quot; &quot;.$_-&gt;{aclstring}; }}
++	if($acls){ for(@{$acls}){$ret .=&quot;acl &quot;.$_-&gt;{name}.&quot; &quot;.$_-&gt;{acltype}.&quot; &quot;.$_-&gt;{aclstring}.&quot;\n&quot;; }}
+ 	return $ret;
+ }
+ 
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/sec.pl	2005-10-05 16:27:08 UTC (rev 27)
+@@ -31,7 +31,7 @@
+ 	&amp;getRoot() or die &quot;Can't get root privileges: $!&quot;;
+ 
+ 	# Compare the files to check if the system is controlling squid.
+-	my $diff = `diff etc/squid.conf $squ_cfg`;
++	my $diff = `diff etc/squid.conf $squ_cfg 2&gt;&amp;1`;
+ 	if($diff eq '' &amp;&amp; $? == 0){ $stat-&gt;{cha} = 0; } 
+ 	else { $stat-&gt;{cha} = 1; }
+ 
+@@ -53,7 +53,7 @@
+ 
+ 		# If squid is running, reconfigure it.
+ 		if ($stat-&gt;{squ} == 1){ 
+-			my $rec = `$squ_bin -k reconfigure`; 
++			my $rec = `$squ_bin -k reconfigure 2&gt;&amp;1`; 
+ 			if ($? == 0){ $res-&gt;{act} .= _(&quot;Configuration reloaded succesfully. &quot;);  } 
+ 			else { $res-&gt;{act} .= _(&quot;Errors reloading the configuration: $!. &quot;); }
+ 			$res-&gt;{act} .= _(&quot;Command output:&quot;).$rec.&quot;\n&quot; if $rec;
+@@ -61,7 +61,7 @@
+ 
+ 		# If squid is stopped, start it.
+ 		elsif ($stat-&gt;{squ} == 0) {  
+-			my $rec .= `/etc/init.d/squid start`; 
++			my $rec .= `/etc/init.d/squid start 2&gt;&amp;1`; 
+ 			if ($? == 0){ $res-&gt;{act} .= _(&quot;Squid started succesfully. &quot;);  } 
+ 			else { $res-&gt;{act} .= _(&quot;Error starting squid: $!. &quot;);  }
+ 			$res-&gt;{act} .= _(&quot;Command output&quot;).&quot;: $rec&quot; if $rec;
+
+Added: trunk/templates/es/newAcl.html
+===================================================================
+--- trunk/templates/es/newAcl.html	2005-10-04 21:55:46 UTC (rev 26)
++++ trunk/templates/es/newAcl.html	2005-10-05 16:27:08 UTC (rev 27)
+@@ -0,0 +1,31 @@
++&lt;h1&gt;Creaci&#243;n de una nueva ACL&lt;/h1&gt;
++					&lt;form action=&quot;index.pl?sect=acl&quot; method=&quot;post&quot;&gt;
++					&lt;table id=&quot;sectForm&quot;&gt;&lt;fieldset&gt;
++						&lt;p&gt;&lt;input type=&quot;hidden&quot; name=&quot;aID&quot; id=&quot;aID&quot;/&gt;&lt;/p&gt;
++						&lt;tr&gt;
++						&lt;td&gt;&lt;p&gt;&lt;label for=&quot;aName&quot;&gt;Nombre&lt;/label&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;td&gt;&lt;p&gt;&lt;input type=&quot;text&quot; name=&quot;aName&quot; id=&quot;aName&quot;/&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;/tr&gt;
++						&lt;tr&gt;
++						&lt;td&gt;&lt;p&gt;&lt;label for=&quot;aType&quot;&gt;Tipo&lt;/label&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;td&gt;&lt;p&gt;&lt;select name=&quot;aType&quot; id=&quot;aType&quot;/&gt;
++							&lt;option&gt;src
++							&lt;option&gt;dst
++							&lt;option&gt;port
++							&lt;option&gt;proto
++						&lt;/select&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;/tr&gt;
++						&lt;tr&gt;
++						&lt;td&gt;&lt;p&gt;&lt;label for=&quot;aString&quot;&gt;Cadena&lt;/label&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;td&gt;&lt;p&gt;&lt;input type=&quot;text&quot; name=&quot;aString&quot; id=&quot;aString&quot;/&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;/tr&gt;
++						&lt;tr&gt;
++						&lt;p&gt;&lt;input type=&quot;hidden&quot; name=&quot;act&quot; value=&quot;add&quot;/&gt;&lt;/p&gt;
++					&lt;/fieldset&gt;
++					&lt;fieldset id=&quot;aSubmit&quot;&gt;
++						&lt;tr&gt;
++						&lt;td colspan=&quot;2&quot; id=&quot;bSumbit&quot;&gt;&lt;p&gt;&lt;input type=&quot;submit&quot; name=&quot;aSubmitB&quot; id=&quot;aSubmitB&quot; value=&quot;Agregar ACL&quot; /&gt;&lt;/p&gt;&lt;/td&gt;
++						&lt;/tr&gt;
++					&lt;/fieldset&gt;&lt;/table&gt;
++					&lt;/form&gt;
++					&lt;!-- MESSAGE --&gt;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000024.html">[Tentaculo-svn] r26 - in trunk: . lib templates/es
+</A></li>
+	<LI>Next message: <A HREF="000026.html">[Tentaculo-svn] r28 - trunk/lib
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#25">[ date ]</a>
+              <a href="thread.html#25">[ thread ]</a>
+              <a href="subject.html#25">[ subject ]</a>
+              <a href="author.html#25">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

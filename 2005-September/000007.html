@@ -1,0 +1,247 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r9 - trunk/lib
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-September/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r9%20-%20trunk/lib&In-Reply-To=%3C200509191525.j8JFP4K2027594%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000006.html">
+   <LINK REL="Next"  HREF="000008.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r9 - trunk/lib</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r9%20-%20trunk/lib&In-Reply-To=%3C200509191525.j8JFP4K2027594%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r9 - trunk/lib">dasenjo at berlios.de
+       </A><BR>
+    <I>Mon Sep 19 17:25:04 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000006.html">[Tentaculo-svn] r8 - trunk/misc
+</A></li>
+        <LI>Next message: <A HREF="000008.html">[Tentaculo-svn] r10 - trunk
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#7">[ date ]</a>
+              <a href="thread.html#7">[ thread ]</a>
+              <a href="subject.html#7">[ subject ]</a>
+              <a href="author.html#7">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-09-19 17:25:04 +0200 (Mon, 19 Sep 2005)
+New Revision: 9
+
+Added:
+   trunk/lib/SessionControl.pm
+Removed:
+   trunk/lib/AccessControl.pm
+Log:
+Name changed. SessionControl is going to manage session data and control.
+
+
+Deleted: trunk/lib/AccessControl.pm
+===================================================================
+--- trunk/lib/AccessControl.pm	2005-09-19 15:16:32 UTC (rev 8)
++++ trunk/lib/AccessControl.pm	2005-09-19 15:25:04 UTC (rev 9)
+@@ -1,82 +0,0 @@
+-#!/usr/bin/perl -w
+-# Script para verificar el estado de la sesi&#243;n de los usuarios.
+-
+-package AccessControl;
+-
+-use strict;
+-use CGI::Session;
+-use Admin;
+-use Digest::MD5 'md5_hex';
+-use Logger qw(message error);
+-
+-sub new{
+-	my $this = shift;
+-	my $class = ref($this) || $this;
+-	my $self = {};
+-	$self-&gt;{cgi}= shift;
+-	$self-&gt;{session}=0;
+-	$self-&gt;{cookie}=0;
+-	bless($self,$class);
+-	return $self;
+-}
+-
+-sub cookie{
+-	my $self = shift;
+-	if(@_) { $self-&gt;{cookie} = shift; }
+-	return $self-&gt;{cookie};
+-}
+-
+-sub param{
+-	my $self = shift;
+-	my $variable = shift;
+-	if (@_){ return $self-&gt;{session}-&gt;param($variable,shift);}
+-	else {return $self-&gt;{session}-&gt;param($variable);}
+-}
+-
+-sub check{
+-	my $self = shift;
+-	my $ph = shift;
+-	my ($u, $p) = ($ph-&gt;{'logUser'}, md5_hex($ph-&gt;{'logPass'}) );
+-	my $id = Admin-&gt;check($u,$p);
+-	if ( $id ) {
+-		$self-&gt;param('logged_in',1);
+-		$self-&gt;{session}-&gt;expires('logged_in',&quot;+10m&quot;);
+-		$self-&gt;param('user_name',$u);
+-		$self-&gt;param('user_id',$id);
+-		Logger-&gt;message(&quot;User logged in with user name $u&quot;);
+-		return 1;
+-	} else { return 0; }
+-}
+-
+-sub changePass {
+-	my $self = shift;
+-	my $ph = shift;		# Param hash obtained with Vars() method
+-	my ($o, $n1, $n2 ) = ($ph-&gt;{'oldPass'}, $ph-&gt;{'newPass'}, $ph-&gt;{'newPass2'});
+-	my ($u, $id) = ( $self-&gt;param('user_name'), $self-&gt;param('user_id') );
+-
+-	if ( Admin-&gt;check($u, md5_hex($o)) &amp;&amp; ($n1 eq $n2) &amp;&amp; Admin-&gt;change($id, md5_hex($n1)) ){
+-		Logger-&gt;message(&quot;Changed password for user $u&quot;);
+-		return 1;
+-	} else { return 0; } 
+-}
+-
+-sub startSession{
+-	my $self = shift;
+-	my $cgi = $self-&gt;{cgi};
+-	my $id = $cgi-&gt;cookie('CGISESSID') || $cgi-&gt;url_param('sid') || $cgi-&gt;param('sid') || undef;
+-	$self-&gt;{session} = new CGI::Session(undef, $id, {Directory=&gt;'/tmp'});
+-	$self-&gt;{cookie} = $cgi-&gt;cookie(CGISESSID =&gt; $self-&gt;{session}-&gt;id);
+-	Logger-&gt;message(&quot;NEW session. id=&quot;.$self-&gt;{session}-&gt;id) unless $id; # Log if new sessid
+-}
+-
+-sub isLoggedIn{
+-	my $self = shift;
+-	return $self-&gt;{session}-&gt;param(&quot;logged_in&quot;);
+-}
+-
+-sub logOut{
+-	my $self = shift;
+-	$self-&gt;{session}-&gt;delete();
+-}
+-
+-1;
+
+Copied: trunk/lib/SessionControl.pm (from rev 6, trunk/lib/AccessControl.pm)
+===================================================================
+--- trunk/lib/AccessControl.pm	2005-09-13 15:53:39 UTC (rev 6)
++++ trunk/lib/SessionControl.pm	2005-09-19 15:25:04 UTC (rev 9)
+@@ -0,0 +1,80 @@
++package SessionControl;
++# This module manages the session stuff.
++
++use strict;
++use CGI::Session;
++use Admin;
++use Digest::MD5 'md5_hex';
++use Logger qw(message error);
++
++sub new{
++	my $this = shift;
++	my $class = ref($this) || $this;
++	my $self = {};
++	$self-&gt;{cgi}= shift;
++	$self-&gt;{session}=0;
++	$self-&gt;{cookie}=0;
++	bless($self,$class);
++	return $self;
++}
++
++sub cookie{
++	my $self = shift;
++	if(@_) { $self-&gt;{cookie} = shift; }
++	return $self-&gt;{cookie};
++}
++
++sub param{
++	my $self = shift;
++	my $variable = shift;
++	if (@_){ return $self-&gt;{session}-&gt;param($variable,shift);}
++	else {return $self-&gt;{session}-&gt;param($variable);}
++}
++
++sub check{
++	my $self = shift;
++	my $ph = shift;
++	my ($u, $p) = ($ph-&gt;{'logUser'}, md5_hex($ph-&gt;{'logPass'}) );
++	my $id = Admin-&gt;check($u,$p);
++	if ( $id ) {
++		$self-&gt;param('logged_in',1);
++		$self-&gt;{session}-&gt;expires('logged_in',&quot;+10m&quot;);
++		$self-&gt;param('user_name',$u);
++		$self-&gt;param('user_id',$id);
++		Logger-&gt;message(&quot;User logged in with user name $u&quot;);
++		return 1;
++	} else { return 0; }
++}
++
++sub changePass {
++	my $self = shift;
++	my $ph = shift;		# Param hash obtained with Vars() method
++	my ($o, $n1, $n2 ) = ($ph-&gt;{'oldPass'}, $ph-&gt;{'newPass'}, $ph-&gt;{'newPass2'});
++	my ($u, $id) = ( $self-&gt;param('user_name'), $self-&gt;param('user_id') );
++
++	if ( Admin-&gt;check($u, md5_hex($o)) &amp;&amp; ($n1 eq $n2) &amp;&amp; Admin-&gt;change($id, md5_hex($n1)) ){
++		Logger-&gt;message(&quot;Changed password for user $u&quot;);
++		return 1;
++	} else { return 0; } 
++}
++
++sub startSession{
++	my $self = shift;
++	my $cgi = $self-&gt;{cgi};
++	my $id = $cgi-&gt;cookie('CGISESSID') || $cgi-&gt;url_param('sid') || $cgi-&gt;param('sid') || undef;
++	$self-&gt;{session} = new CGI::Session(undef, $id, {Directory=&gt;'/tmp'});
++	$self-&gt;{cookie} = $cgi-&gt;cookie(CGISESSID =&gt; $self-&gt;{session}-&gt;id);
++	Logger-&gt;message(&quot;NEW session. id=&quot;.$self-&gt;{session}-&gt;id) unless $id; # Log if new sessid
++}
++
++sub isLoggedIn{
++	my $self = shift;
++	return $self-&gt;{session}-&gt;param(&quot;logged_in&quot;);
++}
++
++sub logOut{
++	my $self = shift;
++	$self-&gt;{session}-&gt;delete();
++}
++
++1;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000006.html">[Tentaculo-svn] r8 - trunk/misc
+</A></li>
+	<LI>Next message: <A HREF="000008.html">[Tentaculo-svn] r10 - trunk
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#7">[ date ]</a>
+              <a href="thread.html#7">[ thread ]</a>
+              <a href="subject.html#7">[ subject ]</a>
+              <a href="author.html#7">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

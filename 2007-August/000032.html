@@ -1,0 +1,119 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r34 - in trunk: doc lib
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r34%20-%20in%20trunk%3A%20doc%20lib&In-Reply-To=%3C200708281601.l7SG1kjl007661%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r34 - in trunk: doc lib</H1>
+    <B>dasenjo at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r34%20-%20in%20trunk%3A%20doc%20lib&In-Reply-To=%3C200708281601.l7SG1kjl007661%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r34 - in trunk: doc lib">dasenjo at mail.berlios.de
+       </A><BR>
+    <I>Tue Aug 28 18:01:46 CEST 2007</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#32">[ date ]</a>
+              <a href="thread.html#32">[ thread ]</a>
+              <a href="subject.html#32">[ subject ]</a>
+              <a href="author.html#32">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2007-08-28 18:01:45 +0200 (Tue, 28 Aug 2007)
+New Revision: 34
+
+Added:
+   trunk/lib/User.pm
+Removed:
+   trunk/lib/Admin.pm
+Modified:
+   trunk/doc/CHANGELOG
+Log:
+* Admin.pm changes to User.pm
+
+
+
+Modified: trunk/doc/CHANGELOG
+===================================================================
+--- trunk/doc/CHANGELOG	2007-07-31 20:14:18 UTC (rev 33)
++++ trunk/doc/CHANGELOG	2007-08-28 16:01:45 UTC (rev 34)
+@@ -2,3 +2,6 @@
+ * New CHANGELOG :)
+ * Admin module is now User module.
+ * More simple directories name in Logger and Template modules.
++
++2007-08-28:
++* Admin.pm changes to User.pm
+
+Deleted: trunk/lib/Admin.pm
+===================================================================
+--- trunk/lib/Admin.pm	2007-07-31 20:14:18 UTC (rev 33)
++++ trunk/lib/Admin.pm	2007-08-28 16:01:45 UTC (rev 34)
+@@ -1,27 +0,0 @@
+-package User;
+-use base 'DBIBase';
+-
+-use strict;
+-
+-User-&gt;table('user');
+-User-&gt;columns(All =&gt; qw/id user_name pass_word type/);
+-
+-
+-sub check{
+-	shift;
+-	my ($u, $p) = @_; 
+-	my $it = User-&gt;search(user_name =&gt; $u, pass_word =&gt; $p);
+-	return $it-&gt;next-&gt;id if $it;
+-	Logger-&gt;message(&quot;Check failed with username $u and password (md5) $p&quot;);
+-	return 0;
+-}
+-
+-sub change{
+-	shift;
+-	my ($id, $p) = @_;
+-	my $a = User-&gt;retrieve($id);
+-	$a-&gt;pass_word($p);
+-	return $a-&gt;update(); 
+-}
+-
+-1;
+
+Copied: trunk/lib/User.pm (from rev 33, trunk/lib/Admin.pm)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#32">[ date ]</a>
+              <a href="thread.html#32">[ thread ]</a>
+              <a href="subject.html#32">[ subject ]</a>
+              <a href="author.html#32">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>

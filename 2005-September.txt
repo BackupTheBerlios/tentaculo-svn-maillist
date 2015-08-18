@@ -1,0 +1,3974 @@
+From dasenjo at unicauca.edu.co  Fri Sep  9 19:00:06 2005
+From: dasenjo at unicauca.edu.co (=?ISO-8859-1?Q?Diego_Andr=E9s_Asenjo_Gonz=E1lez?=)
+Date: Fri, 09 Sep 2005 12:00:06 -0500
+Subject: [Tentaculo-svn] Test mail
+Message-ID: <4321BF96.3030801@unicauca.edu.co>
+
+
+-- 
+Diego Andr?s Asenjo Gonz?lez
+Universidad del Cauca
+Ingeniero en Electr?nica y Telecomunicaciones
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 256 bytes
+Desc: OpenPGP digital signature
+URL: <https://lists.berlios.de/pipermail/tentaculo-svn/attachments/20050909/5b21a309/attachment.pgp>
+
+From dasenjo at unicauca.edu.co  Fri Sep  9 19:06:27 2005
+From: dasenjo at unicauca.edu.co (=?ISO-8859-1?Q?Diego_Andr=E9s_Asenjo_Gonz=E1lez?=)
+Date: Fri, 09 Sep 2005 12:06:27 -0500
+Subject: [Tentaculo-svn] Test mail
+Message-ID: <4321C113.6030800@unicauca.edu.co>
+
+
+-- 
+Diego Andr?s Asenjo Gonz?lez
+Universidad del Cauca
+Ingeniero en Electr?nica y Telecomunicaciones
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 256 bytes
+Desc: OpenPGP digital signature
+URL: <https://lists.berlios.de/pipermail/tentaculo-svn/attachments/20050909/73b3769f/attachment.pgp>
+
+From dasenjo at unicauca.edu.co  Fri Sep  9 19:15:48 2005
+From: dasenjo at unicauca.edu.co (=?ISO-8859-1?Q?Diego_Andr=E9s_Asenjo_Gonz=E1lez?=)
+Date: Fri, 09 Sep 2005 12:15:48 -0500
+Subject: [Tentaculo-svn] Test mail
+Message-ID: <4321C344.1090005@unicauca.edu.co>
+
+
+-- 
+Diego Andr?s Asenjo Gonz?lez
+Universidad del Cauca
+Ingeniero en Electr?nica y Telecomunicaciones
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 256 bytes
+Desc: OpenPGP digital signature
+URL: <https://lists.berlios.de/pipermail/tentaculo-svn/attachments/20050909/dd6365d6/attachment.pgp>
+
+From dasenjo at berlios.de  Tue Sep 13 17:14:22 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Tue, 13 Sep 2005 17:14:22 +0200
+Subject: [Tentaculo-svn] r5 - in trunk: . elements/css lib templates/es
+Message-ID: <200509131514.j8DFEMFt024332@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-13 17:14:22 +0200 (Tue, 13 Sep 2005)
+New Revision: 5
+
+Added:
+   trunk/lib/Cache.pm
+   trunk/lib/Cache_Peer.pm
+Removed:
+   trunk/lib/CacheControl.pm
+Modified:
+   trunk/elements/css/contents.css
+   trunk/index.pl
+   trunk/lib/Cache_Dir.pm
+   trunk/lib/General.pm
+   trunk/lib/Template.pm
+   trunk/templates/es/cache_table.html
+   trunk/templates/es/newCachedir.html
+Log:
+The Cache module is now like the General one.
+
+
+Modified: trunk/elements/css/contents.css
+===================================================================
+--- trunk/elements/css/contents.css	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/elements/css/contents.css	2005-09-13 15:14:22 UTC (rev 5)
+@@ -94,7 +94,7 @@
+ 				#content h3
+ 				{
+ 					width:80px;
+-					margin:5px 15px 15px 350px;
++					margin:5px 15px 15px 15px;
+ 					padding:0;
+ 					font-size:12px;
+ 					color:#666666;
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/index.pl	2005-09-13 15:14:22 UTC (rev 5)
+@@ -23,9 +23,9 @@
+ 
+ # Per-section modules and their objects.
+ use General;
+-use CacheControl;
++use Cache;
+ my $gen = General->new();
+-my $cc = CacheControl->new();
++my $cach = Cache->new();
+ 
+ # HTML Page variables. t = template. c = content (or template fill).
+ my ($t,$c);
+@@ -37,7 +37,7 @@
+ 	my $sub = $phr->{'sub'} || $cgi->url_param('sub') || '';
+ 	my $act = $phr->{'act'} || $cgi->url_param('act') || '';
+ 
+-	#Logger->message("index.pl vars sect: $sect sub: $sub act: $act");
++	Logger->message("index.pl vars sect: $sect sub: $sub act: $act");
+ 	
+ 	# Valid content sections
+ 	my @csects = qw/general cache settings status/;
+@@ -62,8 +62,6 @@
+ 		$c = $gen->load($c) unless $act;
+ 		if ( $act eq 'change' ){
+ 			my $err = $gen->validate($phr);
+-			#$c = Template->result($gen->change($phr), $sect) unless $err;
+-			#Logger->error("Hay errores en general") if $err;
+ 			$c = $gen->result($gen->change($phr)) unless $err;
+ 			$c = $gen->load($c, $err) if $err;
+ 		}
+@@ -74,23 +72,27 @@
+ 			if ( $act eq 'view' ) {
+ 				$c = Template->read('cachedir');
+ 				my $id = $cgi->url_param('id');
+-				$c = Template->loadCachedir($c, $cc->getDir($id)) if $id;
++				$c = Template->loadCachedir($c, $cach->getDir($id)) if $id;
+ 			} elsif ( $act eq 'change' ) {
+-				$c = Template->result($cc->changeDir($phr), $sect);
++				$c = Template->result($cach->changeDir($phr), $sect);
+ 			} elsif ( $act eq 'new' ) {
+-				$c = Template->read('newCachedir');
++				$c = $cach->newDir() 
+ 			} elsif ( $act eq 'add' ) {
+-				$c = Template->result($cc->addDir($phr), $sect);
++				my $err = $cach->validateDir($phr);
++				$c = $cach->result($cach->addDir($phr)) unless $err;
++				$c = $cach->newDir($err) if $err;
+ 			} elsif ( $act eq 'del' ) {
+ 				my $id = $cgi->url_param('id');
+-				$c = Template->result($cc->delDir($id), $sect) if $id;
++				$c = Template->result($cach->delDir($id), $sect) if $id;
+ 			}
+ 		} elsif ( !$sub ) {
++			$c = $cach->load($c) unless $act;
+ 			if ( $act eq 'change' ){
+-				$c = Template->result($cc->changeMem($phr), $sect);
++				my $err = $cach->validateMem($phr);
++				$c = $cach->result($cach->changeMem($phr)) unless $err;
++				$c = $cach->load($c, $err) if $err;
+ 			}
+-			$c = Template->loadCache($c, $cc->getMem(), $cc->getDirs());
+-		} else {  Logger->error('Wrong subsection in Cache.')  }
++		}
+ 	} elsif ( $sect eq 'settings' ) {
+ 		#-- Settings section --#
+ 		if($sub eq 'password'){
+
+Copied: trunk/lib/Cache.pm (from rev 3, trunk/lib/CacheControl.pm)
+===================================================================
+--- trunk/lib/CacheControl.pm	2005-09-09 15:13:47 UTC (rev 3)
++++ trunk/lib/Cache.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -0,0 +1,145 @@
++package Cache;
++
++use strict;
++use Logger;
++use Template;
++use General;
++use Cache_Dir;
++use Cache_Peer;
++
++sub new{
++	my $this = shift;
++	my $class = ref($this) || $this;
++	my $self = {};
++	bless($self,$class);
++	return $self;
++}
++
++sub changeDir{
++	my $self = shift;
++	Cache_Dir->changeCachedir(shift);
++}
++
++sub addDir{
++	my $self = shift;
++	return Cache_Dir->addCachedir(shift);
++}
++
++sub delDir{
++	my $self = shift;
++	Cache_Dir->delCachedir(shift);
++}
++
++sub newDir{
++	my ($self, $tags) = @_;
++	my $c = Template->read('newCachedir');
++	if ($tags){
++		my $m = _("There was errrors validating the data for the new cache directory.");
++		foreach (@{$tags}){
++			$m .= _(" The entered path seems to be wrong.") if $_ eq 'cDir';	
++			$m .= _(" The entered size seems to be wrong.") if $_ eq 'cSize';	
++		}
++		$c =~ s/<!-- MESSAGE -->/$m/;
++	}
++	return $c;
++}
++
++sub validateDir{
++	shift;
++	my $ph = shift;
++	my @tags;		# Invalid tags
++
++	# cDir must be a valid system directory.
++	push(@tags,'cDir') unless -d $ph->{cDir};
++
++	# cSize must be an integer.
++	my $csize = $ph->{cSize};
++	push(@tags,'cSize') unless $csize =~ /^\d+$/;
++	
++	# TODO: cDir must be empty and its filesystem must have cSize free bytes.
++
++	return \@tags if @tags;
++	return 0;
++}
++
++sub getPeer{
++	my $self = shift;
++	return Cache_Peer->getCachepeer(shift); 
++}
++
++sub getPeers{
++	my $self = shift;
++	return Cache_Peer->getAll(); 
++}
++
++sub changePeer{
++	my $self = shift;
++	Cache_Peer->changeCachepeer(shift);
++}
++
++sub addPeer{
++	my $self = shift;
++	return Cache_Peer->addCachepeer(shift);
++}
++
++sub delPeer{
++	my $self = shift;
++	Cache_Peer->delCachepeer(shift);
++}
++
++sub load{
++	shift;
++	my $c = shift;
++	my $mem = General->getCacheMem;
++	my $cda = Cache_Dir->getAll;
++	$c =~ s/name="cMem"/name="cMem" value="$mem"/ if $mem;
++	if ($cda){
++		my ($table, $row) = (Template->read('cache_table'), Template->read('cache_row'));
++		foreach my $d (@{$cda}){  $dirs .= &loadCacheRow($dt, $d);  }
++		#$dirs .= Template->read('cache_table_end');
++		$c =~ s/<!-- CACHE_DIRS -->/$dirs/;
++	} else {
++		my $no_dir = "<p>"._("There are not cache directories configured.")."</p>";
++		$no_dir .= '<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">'._("Agregar nuevo directorio de Cache").'</a></p></div>';
++		$c =~ s/<!-- CACHE_DIRS -->/$no_dir/;
++	}
++	return $c;
++}
++
++sub loadCacheRow{
++	my ($dt,$d) = @_;
++	$dt =~ s/ID/$d->{id}/g;
++	$dt =~ s/<!-- DIR -->/$d->{directory}/;
++	$dt =~ s/<!-- SIZE -->/$d->{size}/;
++	return $dt;
++}
++
++sub loadCachedir{
++	shift;
++	my ($c,$d) = @_;
++	$c =~ s/name="cID"/name="cID" value="$d->{id}"/ if $d->{id};
++	$c =~ s/name="cDir"/name="cDir" value="$d->{directory}"/ if $d->{directory};
++	$c =~ s/name="cSize"/name="cSize" value="$d->{size}"/ if $d->{size};
++	return $c;
++}
++
++sub result{
++	shift;
++	my ($r, $sub) = @_;
++	my ($t, $m);
++	my $res = Template->read('result');
++	if ($r){ 
++		$t = _('Successful change'); 
++		$m = _('The Cache Configuration has been changed successfully.');
++	} else { 
++		$t = _('Unsuccessful change'); 
++		$m = _('There was a problem trying to apply the changes. Please try again.')
++	}
++	$res =~ s/<!-- TITLE -->/$t/;
++	$res =~ s/<!-- MESSAGE -->/$m/;
++	$res =~ s/SECTION/cache/g;
++	return $res;
++}
++
++
++1;
+
+Deleted: trunk/lib/CacheControl.pm
+===================================================================
+--- trunk/lib/CacheControl.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/CacheControl.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -1,50 +0,0 @@
+-package CacheControl;
+-
+-use strict;
+-use General;
+-use Cache_Dir;
+-
+-sub new{
+-	my $this = shift;
+-	my $class = ref($this) || $this;
+-	my $self = {};
+-	bless($self,$class);
+-	return $self;
+-}
+-
+-sub getMem{
+-	my $self = shift;
+-	return General->getCacheMem(); 
+-}
+-
+-sub getDirs{
+-	my $self = shift;
+-	return Cache_Dir->getAll(); 
+-}
+-
+-sub changeMem{
+-	my $self = shift;
+-	return General->changeCacheMem(shift);
+-}
+-
+-sub getDir{
+-	my $self = shift;
+-	return Cache_Dir->getCachedir(shift); 
+-}
+-
+-sub changeDir{
+-	my $self = shift;
+-	Cache_Dir->changeCachedir(shift);
+-}
+-
+-sub addDir{
+-	my $self = shift;
+-	return Cache_Dir->addCachedir(shift);
+-}
+-
+-sub delDir{
+-	my $self = shift;
+-	Cache_Dir->delCachedir(shift);
+-}
+-
+-1;
+
+Modified: trunk/lib/Cache_Dir.pm
+===================================================================
+--- trunk/lib/Cache_Dir.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/Cache_Dir.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -11,9 +11,10 @@
+ 	shift;
+ 	my @dirs;
+ 	foreach my $d (Cache_Dir->retrieve_all){
+-		push @dirs, {id => $d->id, directory => $d->directory, size => $d->size};
++		push @dirs, { id => $d->id, directory => $d->directory, size => $d->size, };
+ 	}
+-	return \@dirs;
++	return \@dirs if @dirs;
++	return 0;
+ }
+ 
+ sub getCachedir{
+
+Added: trunk/lib/Cache_Peer.pm
+===================================================================
+--- trunk/lib/Cache_Peer.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/Cache_Peer.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -0,0 +1,49 @@
++package Cache_Peer;
++use base 'DBIBase';
++
++use strict;
++use Logger;
++
++Cache_Peer->table('cache_peer');
++Cache_Peer->columns(All => qw/id address http_port icp_port/);
++
++sub getAll{
++	shift;
++	my @peers;
++	foreach my $p (Cache_Peer->retrieve_all){
++		push @peers, { id => $p->id, address => $p->directory, http_port => $p->http_port, cp_port => $p->icp_port, };
++	}
++	return \@peers;
++}
++
++sub getCachepeer{
++	shift;
++	my $p = Cache_Peer->retrieve(shift);
++	return { id => $p->id, address => $p->directory, http_port => $p->http_port, cp_port => $p->icp_port, } if $p;
++}
++
++sub changeCachedir{
++	shift;
++	my $ph = shift;
++	my $cd = Cache_Peer->retrieve($ph->{cID});
++	$cd->directory($ph->{cPeer});
++	$cd->size($ph->{cSize});
++	return $cd->update;
++}
++
++sub addCachedir{
++	shift;
++	my $ph = shift;
++	return Cache_Peer->create({
++		directory => $ph->{cPeer},
++		size => $ph->{cSize},
++	});
++}
++
++sub delCachedir{
++	shift;
++	my $p = Cache_Peer->retrieve(shift);
++	return $p->delete() if $p;
++}
++
++1;
+
+
+Property changes on: trunk/lib/Cache_Peer.pm
+___________________________________________________________________
+Name: svn:executable
+   + *
+
+Modified: trunk/lib/General.pm
+===================================================================
+--- trunk/lib/General.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/General.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -127,7 +127,7 @@
+ 	my $res = Template->read('result');
+ 	if ($r){ 
+ 		$t = _('Successful change'); 
+-		$m = _('The General Configuration has been changed successfully.');
++		$m = _('The general configuration has been changed successfully.');
+ 	} else { 
+ 		$t = _('Unsuccessful change'); 
+ 		$m = _('There was a problem trying to apply the changes. Please try again.')
+
+Modified: trunk/lib/Template.pm
+===================================================================
+--- trunk/lib/Template.pm	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/lib/Template.pm	2005-09-13 15:14:22 UTC (rev 5)
+@@ -41,49 +41,6 @@
+ 	$res =~ s/SECTION/$sect/g;
+ 	return $res;
+ }
+-
+-sub loadGeneral{
+-	shift;
+-	my ($c,$s) = @_;
+-	$c =~ s/name="gEnable"/name="gEnable" checked="checked"/ if $s->{enable};
+-	$c =~ s/name="gHPort"/name="gHPort" value="$s->{http_port}"/ if $s->{http_port};
+-	$c =~ s/name="gName"/name="gName" value="$s->{visible_hostname}"/ if $s->{visible_hostname};
+-	$c =~ s/name="gDomain"/name="gDomain" value="$s->{append_domain}"/ if $s->{append_domain};
+-	$c =~ s/name="gIPort"/name="gIPort" value="$s->{icp_port}"/ if $s->{icp_port};
+-	return $c;
+-}
+-
+-sub loadCache{
+-	shift;
+-	my ($c,$mem,$cda) = @_;		# $cda = cache dirs array
+-	$c =~ s/name="cMem"/name="cMem" value="$mem"/ if $mem;
+-	if ($cda){
+-		my ($dirs, $dt) = (Template->read('cache_table'), Template->read('cache_row'));
+-		foreach my $d (@{$cda}){  $dirs .= Template->loadCacheRow($dt, $d);  }
+-		$dirs .= Template->read('cache_table_end');
+-		$c =~ s/<!-- CACHE_DIRS -->/$dirs/;
+-	}
+-	return $c;
+-}
+-
+-sub loadCacheRow{
+-	shift;
+-	my ($dt,$d) = @_;
+-	$dt =~ s/ID/$d->{id}/g;
+-	$dt =~ s/<!-- DIR -->/$d->{directory}/;
+-	$dt =~ s/<!-- SIZE -->/$d->{size}/;
+-	return $dt;
+-}
+-
+-sub loadCachedir{
+-	shift;
+-	my ($c,$d) = @_;
+-	$c =~ s/name="cID"/name="cID" value="$d->{id}"/ if $d->{id};
+-	$c =~ s/name="cDir"/name="cDir" value="$d->{directory}"/ if $d->{directory};
+-	$c =~ s/name="cSize"/name="cSize" value="$d->{size}"/ if $d->{size};
+-	return $c;
+-}
+-
+ sub loginError{
+ 	shift;
+ 	my $p = shift;
+
+Modified: trunk/templates/es/cache_table.html
+===================================================================
+--- trunk/templates/es/cache_table.html	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/templates/es/cache_table.html	2005-09-13 15:14:22 UTC (rev 5)
+@@ -1,2 +1,6 @@
++				<h3>Directorios de Cache</h3>	
+ 				<table id="sectForm">
+ 						<tr><td><p class="theader">Directorio</p></td><td><p class="theader">Tama?o</p></td></tr>
++					<!-- ROWS -->
++				</table>
++				<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">Agregar nuevo directorio de Cache</a></p></div>
+
+Modified: trunk/templates/es/newCachedir.html
+===================================================================
+--- trunk/templates/es/newCachedir.html	2005-09-09 15:35:18 UTC (rev 4)
++++ trunk/templates/es/newCachedir.html	2005-09-13 15:14:22 UTC (rev 5)
+@@ -20,3 +20,4 @@
+ 						</fieldset>
+ 					</table>
+ 					</form>
++					<!-- MESSAGE -->
+
+
+
+From dasenjo at berlios.de  Tue Sep 13 17:53:39 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Tue, 13 Sep 2005 17:53:39 +0200
+Subject: [Tentaculo-svn] r6 - in trunk: lib templates/es
+Message-ID: <200509131553.j8DFrdKk027793@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-13 17:53:39 +0200 (Tue, 13 Sep 2005)
+New Revision: 6
+
+Removed:
+   trunk/templates/es/cache_table_end.html
+Modified:
+   trunk/lib/Cache.pm
+   trunk/templates/es/cache.html
+   trunk/templates/es/cache_table.html
+Log:
+More cache stuff.
+
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-09-13 15:14:22 UTC (rev 5)
++++ trunk/lib/Cache.pm	2005-09-13 15:53:39 UTC (rev 6)
+@@ -62,6 +62,24 @@
+ 	return 0;
+ }
+ 
++sub validateMem{
++	shift;
++	my $ph = shift;
++	my @tags;		# Invalid tags
++
++	# cMem must be an integer (could be in Mb).
++	my $cmem = $ph->{cMem};
++	push(@tags,'cMem') unless $cmem =~ /^\d+(Mb)?$/;
++
++	return \@tags if @tags;
++	return 0;
++}
++
++sub changeMem{
++	my $self = shift;
++	General->changeCacheMem(shift);
++}
++
+ sub getPeer{
+ 	my $self = shift;
+ 	return Cache_Peer->getCachepeer(shift); 
+@@ -89,29 +107,37 @@
+ 
+ sub load{
+ 	shift;
+-	my $c = shift;
++	my ($c,$tags) = @_;
+ 	my $mem = General->getCacheMem;
+ 	my $cda = Cache_Dir->getAll;
+ 	$c =~ s/name="cMem"/name="cMem" value="$mem"/ if $mem;
+ 	if ($cda){
++		my $dirs;
+ 		my ($table, $row) = (Template->read('cache_table'), Template->read('cache_row'));
+-		foreach my $d (@{$cda}){  $dirs .= &loadCacheRow($dt, $d);  }
+-		#$dirs .= Template->read('cache_table_end');
+-		$c =~ s/<!-- CACHE_DIRS -->/$dirs/;
++		foreach my $dir (@{$cda}){ $dirs .= &loadCacheRow($row, $dir); }
++		$table =~ s/<!-- CACHE_DIRS -->/$dirs/;
++		$c =~ s/<!-- DIRS_TABLE -->/$table/;
+ 	} else {
+ 		my $no_dir = "<p>"._("There are not cache directories configured.")."</p>";
+ 		$no_dir .= '<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">'._("Agregar nuevo directorio de Cache").'</a></p></div>';
+ 		$c =~ s/<!-- CACHE_DIRS -->/$no_dir/;
+ 	}
++	if($tags){
++		foreach (@{$tags}){
++			$c =~ s/for="cMem"/class="invalid" for="cMem"/ if $_ eq 'cMem';	
++		}
++			my $m = '<div id="sectForm"><p class="invalid">'._("The value entered for the memory is invalid. It have to be an integer (in Kb by default or with an explicit Mb).")."</p></div>";
++			$c =~ s/<!-- MESSAGE -->/$m/;
++	}
+ 	return $c;
+ }
+ 
+ sub loadCacheRow{
+-	my ($dt,$d) = @_;
+-	$dt =~ s/ID/$d->{id}/g;
+-	$dt =~ s/<!-- DIR -->/$d->{directory}/;
+-	$dt =~ s/<!-- SIZE -->/$d->{size}/;
+-	return $dt;
++	my ($row,$dir) = @_;
++	$row =~ s/ID/$dir->{id}/g;
++	$row =~ s/<!-- DIR -->/$dir->{directory}/;
++	$row =~ s/<!-- SIZE -->/$dir->{size}/;
++	return $row;
+ }
+ 
+ sub loadCachedir{
+
+Modified: trunk/templates/es/cache.html
+===================================================================
+--- trunk/templates/es/cache.html	2005-09-13 15:14:22 UTC (rev 5)
++++ trunk/templates/es/cache.html	2005-09-13 15:53:39 UTC (rev 6)
+@@ -15,4 +15,5 @@
+ 					</fieldset>
+ 				</table>
+ 				</form>
+-				<!-- CACHE_DIRS -->
++				<!-- MESSAGE -->
++				<!-- DIRS_TABLE -->
+
+Modified: trunk/templates/es/cache_table.html
+===================================================================
+--- trunk/templates/es/cache_table.html	2005-09-13 15:14:22 UTC (rev 5)
++++ trunk/templates/es/cache_table.html	2005-09-13 15:53:39 UTC (rev 6)
+@@ -1,6 +1,6 @@
+ 				<h3>Directorios de Cache</h3>	
+ 				<table id="sectForm">
+ 						<tr><td><p class="theader">Directorio</p></td><td><p class="theader">Tama?o</p></td></tr>
+-					<!-- ROWS -->
++					<!-- CACHE_DIRS -->
+ 				</table>
+ 				<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">Agregar nuevo directorio de Cache</a></p></div>
+
+Deleted: trunk/templates/es/cache_table_end.html
+===================================================================
+--- trunk/templates/es/cache_table_end.html	2005-09-13 15:14:22 UTC (rev 5)
++++ trunk/templates/es/cache_table_end.html	2005-09-13 15:53:39 UTC (rev 6)
+@@ -1,2 +0,0 @@
+-					</table>
+-					<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">Agregar nuevo directorio de Cache</a></p></div>
+
+
+
+From dasenjo at berlios.de  Thu Sep 15 10:47:23 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Thu, 15 Sep 2005 10:47:23 +0200
+Subject: [Tentaculo-svn] r7 - in trunk: . lib templates/es
+Message-ID: <200509150847.j8F8lNb5030315@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-15 10:47:23 +0200 (Thu, 15 Sep 2005)
+New Revision: 7
+
+Modified:
+   trunk/index.pl
+   trunk/lib/Cache.pm
+   trunk/lib/Cache_Dir.pm
+   trunk/templates/es/cachedir.html
+Log:
+Cache stuff is completed. 
+It is almost an alpha version.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-13 15:53:39 UTC (rev 6)
++++ trunk/index.pl	2005-09-15 08:47:23 UTC (rev 7)
+@@ -67,31 +67,34 @@
+ 		}
+ 	} elsif ( $sect eq 'cache' ) {
+ 		#-- Cache section --#
+-		if($sub eq 'dir'){
++		if(!$sub){
++			$c = $cach->load($c) unless $act;
++			if ( $act eq 'change' ){
++				my $err = $cach->validateMem($phr);
++				$c = $cach->result($cach->changeMem($phr)) unless $err;
++				$c = $cach->load($c, $err) if $err;
++			}
++		} elsif($sub eq 'dir'){
+ 			# cache_dir subsection 
+ 			if ( $act eq 'view' ) {
+ 				$c = Template->read('cachedir');
+ 				my $id = $cgi->url_param('id');
+-				$c = Template->loadCachedir($c, $cach->getDir($id)) if $id;
++				$c = $cach->loadCachedir($c, $id) if $id;
+ 			} elsif ( $act eq 'change' ) {
+-				$c = Template->result($cach->changeDir($phr), $sect);
++				my ($err, $id) = ($cach->validateDir($phr), $phr->{cID});
++				$c = $cach->result($cach->changeDir($phr)) unless $err;
++				$c = Template->read('cachedir') if $err;
++				$c = $cach->loadCachedir($c, $id, $err) if $id || $err;
+ 			} elsif ( $act eq 'new' ) {
+-				$c = $cach->newDir() 
++				$c = $cach->newDir();
+ 			} elsif ( $act eq 'add' ) {
+ 				my $err = $cach->validateDir($phr);
+ 				$c = $cach->result($cach->addDir($phr)) unless $err;
+ 				$c = $cach->newDir($err) if $err;
+ 			} elsif ( $act eq 'del' ) {
+ 				my $id = $cgi->url_param('id');
+-				$c = Template->result($cach->delDir($id), $sect) if $id;
++				$c = $cach->result($cach->delDir($id)) if $id;
+ 			}
+-		} elsif ( !$sub ) {
+-			$c = $cach->load($c) unless $act;
+-			if ( $act eq 'change' ){
+-				my $err = $cach->validateMem($phr);
+-				$c = $cach->result($cach->changeMem($phr)) unless $err;
+-				$c = $cach->load($c, $err) if $err;
+-			}
+ 		}
+ 	} elsif ( $sect eq 'settings' ) {
+ 		#-- Settings section --#
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-09-13 15:53:39 UTC (rev 6)
++++ trunk/lib/Cache.pm	2005-09-15 08:47:23 UTC (rev 7)
+@@ -15,6 +15,33 @@
+ 	return $self;
+ }
+ 
++sub load{
++	shift;
++	my ($c,$tags) = @_;
++	my $mem = General->getCacheMem;
++	my $cda = Cache_Dir->getAll;
++	$c =~ s/name="cMem"/name="cMem" value="$mem"/ if $mem;
++	if ($cda){
++		my $dirs;
++		my ($table, $row) = (Template->read('cache_table'), Template->read('cache_row'));
++		foreach my $dir (@{$cda}){ $dirs .= &loadCacheRow($row, $dir); }
++		$table =~ s/<!-- CACHE_DIRS -->/$dirs/;
++		$c =~ s/<!-- DIRS_TABLE -->/$table/;
++	} else {
++		my $no_dir = "<p>"._("There are not cache directories configured.")."</p>";
++		$no_dir .= '<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">'._("Agregar nuevo directorio de Cache").'</a></p></div>';
++		$c =~ s/<!-- DIRS_TABLE -->/$no_dir/;
++	}
++	if($tags){
++		foreach (@{$tags}){
++			$c =~ s/for="cMem"/class="invalid" for="cMem"/ if $_ eq 'cMem';	
++		}
++			my $m = '<div id="sectForm"><p class="invalid">'._("The value entered for the memory is invalid. It have to be an integer (in Kb by default or with an explicit Mb).")."</p></div>";
++			$c =~ s/<!-- MESSAGE -->/$m/;
++	}
++	return $c;
++}
++
+ sub changeDir{
+ 	my $self = shift;
+ 	Cache_Dir->changeCachedir(shift);
+@@ -27,7 +54,7 @@
+ 
+ sub delDir{
+ 	my $self = shift;
+-	Cache_Dir->delCachedir(shift);
++	return Cache_Dir->delCachedir(shift);
+ }
+ 
+ sub newDir{
+@@ -105,33 +132,6 @@
+ 	Cache_Peer->delCachepeer(shift);
+ }
+ 
+-sub load{
+-	shift;
+-	my ($c,$tags) = @_;
+-	my $mem = General->getCacheMem;
+-	my $cda = Cache_Dir->getAll;
+-	$c =~ s/name="cMem"/name="cMem" value="$mem"/ if $mem;
+-	if ($cda){
+-		my $dirs;
+-		my ($table, $row) = (Template->read('cache_table'), Template->read('cache_row'));
+-		foreach my $dir (@{$cda}){ $dirs .= &loadCacheRow($row, $dir); }
+-		$table =~ s/<!-- CACHE_DIRS -->/$dirs/;
+-		$c =~ s/<!-- DIRS_TABLE -->/$table/;
+-	} else {
+-		my $no_dir = "<p>"._("There are not cache directories configured.")."</p>";
+-		$no_dir .= '<div id="sectForm"><p><a href="index.pl?sect=cache&sub=dir&act=new">'._("Agregar nuevo directorio de Cache").'</a></p></div>';
+-		$c =~ s/<!-- CACHE_DIRS -->/$no_dir/;
+-	}
+-	if($tags){
+-		foreach (@{$tags}){
+-			$c =~ s/for="cMem"/class="invalid" for="cMem"/ if $_ eq 'cMem';	
+-		}
+-			my $m = '<div id="sectForm"><p class="invalid">'._("The value entered for the memory is invalid. It have to be an integer (in Kb by default or with an explicit Mb).")."</p></div>";
+-			$c =~ s/<!-- MESSAGE -->/$m/;
+-	}
+-	return $c;
+-}
+-
+ sub loadCacheRow{
+ 	my ($row,$dir) = @_;
+ 	$row =~ s/ID/$dir->{id}/g;
+@@ -142,10 +142,19 @@
+ 
+ sub loadCachedir{
+ 	shift;
+-	my ($c,$d) = @_;
++	my ($c, $id, $tags) = @_;
++	my $d = Cache_Dir->getCachedir($id) if $id;
+ 	$c =~ s/name="cID"/name="cID" value="$d->{id}"/ if $d->{id};
+ 	$c =~ s/name="cDir"/name="cDir" value="$d->{directory}"/ if $d->{directory};
+ 	$c =~ s/name="cSize"/name="cSize" value="$d->{size}"/ if $d->{size};
++	if ($tags){
++		my $m = _("There was errrors validating the data for changed cache directory.");
++		foreach (@{$tags}){
++			$m .= _(" The entered path seems to be wrong.") if $_ eq 'cDir';	
++			$m .= _(" The entered size seems to be wrong.") if $_ eq 'cSize';	
++		}
++		$c =~ s/<!-- MESSAGE -->/$m/;
++	}
+ 	return $c;
+ }
+ 
+
+Modified: trunk/lib/Cache_Dir.pm
+===================================================================
+--- trunk/lib/Cache_Dir.pm	2005-09-13 15:53:39 UTC (rev 6)
++++ trunk/lib/Cache_Dir.pm	2005-09-15 08:47:23 UTC (rev 7)
+@@ -27,9 +27,10 @@
+ 	shift;
+ 	my $ph = shift;
+ 	my $cd = Cache_Dir->retrieve($ph->{cID});
+-	$cd->directory($ph->{cDir});
+-	$cd->size($ph->{cSize});
+-	return $cd->update;
++	$cd->directory($ph->{cDir}) if $cd;
++	$cd->size($ph->{cSize}) if $cd;
++	return $cd->update if $cd;
++	return 0;
+ }
+ 
+ sub addCachedir{
+@@ -45,6 +46,7 @@
+ 	shift;
+ 	my $d = Cache_Dir->retrieve(shift);
+ 	return $d->delete() if $d;
++	return 0;
+ }
+ 
+ 1;
+
+Modified: trunk/templates/es/cachedir.html
+===================================================================
+--- trunk/templates/es/cachedir.html	2005-09-13 15:53:39 UTC (rev 6)
++++ trunk/templates/es/cachedir.html	2005-09-15 08:47:23 UTC (rev 7)
+@@ -21,3 +21,4 @@
+ 						</fieldset>
+ 					</table>
+ 					</form>
++					<!-- MESSAGE -->
+
+
+
+From dasenjo at berlios.de  Mon Sep 19 17:16:33 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Mon, 19 Sep 2005 17:16:33 +0200
+Subject: [Tentaculo-svn] r8 - trunk/misc
+Message-ID: <200509191516.j8JFGXPO026795@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-19 17:16:32 +0200 (Mon, 19 Sep 2005)
+New Revision: 8
+
+Modified:
+   trunk/misc/apache.conf
+Log:
+Now there are two executable scripts: index.pl for normal operation, and sec.pl to execute commands that need root privileges.
+
+
+Modified: trunk/misc/apache.conf
+===================================================================
+--- trunk/misc/apache.conf	2005-09-15 08:47:23 UTC (rev 7)
++++ trunk/misc/apache.conf	2005-09-19 15:16:32 UTC (rev 8)
+@@ -14,7 +14,7 @@
+     Allow from All
+ </Location>
+ 
+-<Location /tentaculo/index.pl>
++<Location ~ "/tentaculo/(index|sec).pl">
+     Allow from All
+     SetHandler perl-script
+     PerlHandler Apache::Registry
+
+
+
+From dasenjo at berlios.de  Mon Sep 19 17:25:04 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Mon, 19 Sep 2005 17:25:04 +0200
+Subject: [Tentaculo-svn] r9 - trunk/lib
+Message-ID: <200509191525.j8JFP4K2027594@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-19 17:25:04 +0200 (Mon, 19 Sep 2005)
+New Revision: 9
+
+Added:
+   trunk/lib/SessionControl.pm
+Removed:
+   trunk/lib/AccessControl.pm
+Log:
+Name changed. SessionControl is going to manage session data and control.
+
+
+Deleted: trunk/lib/AccessControl.pm
+===================================================================
+--- trunk/lib/AccessControl.pm	2005-09-19 15:16:32 UTC (rev 8)
++++ trunk/lib/AccessControl.pm	2005-09-19 15:25:04 UTC (rev 9)
+@@ -1,82 +0,0 @@
+-#!/usr/bin/perl -w
+-# Script para verificar el estado de la sesi?n de los usuarios.
+-
+-package AccessControl;
+-
+-use strict;
+-use CGI::Session;
+-use Admin;
+-use Digest::MD5 'md5_hex';
+-use Logger qw(message error);
+-
+-sub new{
+-	my $this = shift;
+-	my $class = ref($this) || $this;
+-	my $self = {};
+-	$self->{cgi}= shift;
+-	$self->{session}=0;
+-	$self->{cookie}=0;
+-	bless($self,$class);
+-	return $self;
+-}
+-
+-sub cookie{
+-	my $self = shift;
+-	if(@_) { $self->{cookie} = shift; }
+-	return $self->{cookie};
+-}
+-
+-sub param{
+-	my $self = shift;
+-	my $variable = shift;
+-	if (@_){ return $self->{session}->param($variable,shift);}
+-	else {return $self->{session}->param($variable);}
+-}
+-
+-sub check{
+-	my $self = shift;
+-	my $ph = shift;
+-	my ($u, $p) = ($ph->{'logUser'}, md5_hex($ph->{'logPass'}) );
+-	my $id = Admin->check($u,$p);
+-	if ( $id ) {
+-		$self->param('logged_in',1);
+-		$self->{session}->expires('logged_in',"+10m");
+-		$self->param('user_name',$u);
+-		$self->param('user_id',$id);
+-		Logger->message("User logged in with user name $u");
+-		return 1;
+-	} else { return 0; }
+-}
+-
+-sub changePass {
+-	my $self = shift;
+-	my $ph = shift;		# Param hash obtained with Vars() method
+-	my ($o, $n1, $n2 ) = ($ph->{'oldPass'}, $ph->{'newPass'}, $ph->{'newPass2'});
+-	my ($u, $id) = ( $self->param('user_name'), $self->param('user_id') );
+-
+-	if ( Admin->check($u, md5_hex($o)) && ($n1 eq $n2) && Admin->change($id, md5_hex($n1)) ){
+-		Logger->message("Changed password for user $u");
+-		return 1;
+-	} else { return 0; } 
+-}
+-
+-sub startSession{
+-	my $self = shift;
+-	my $cgi = $self->{cgi};
+-	my $id = $cgi->cookie('CGISESSID') || $cgi->url_param('sid') || $cgi->param('sid') || undef;
+-	$self->{session} = new CGI::Session(undef, $id, {Directory=>'/tmp'});
+-	$self->{cookie} = $cgi->cookie(CGISESSID => $self->{session}->id);
+-	Logger->message("NEW session. id=".$self->{session}->id) unless $id; # Log if new sessid
+-}
+-
+-sub isLoggedIn{
+-	my $self = shift;
+-	return $self->{session}->param("logged_in");
+-}
+-
+-sub logOut{
+-	my $self = shift;
+-	$self->{session}->delete();
+-}
+-
+-1;
+
+Copied: trunk/lib/SessionControl.pm (from rev 6, trunk/lib/AccessControl.pm)
+===================================================================
+--- trunk/lib/AccessControl.pm	2005-09-13 15:53:39 UTC (rev 6)
++++ trunk/lib/SessionControl.pm	2005-09-19 15:25:04 UTC (rev 9)
+@@ -0,0 +1,80 @@
++package SessionControl;
++# This module manages the session stuff.
++
++use strict;
++use CGI::Session;
++use Admin;
++use Digest::MD5 'md5_hex';
++use Logger qw(message error);
++
++sub new{
++	my $this = shift;
++	my $class = ref($this) || $this;
++	my $self = {};
++	$self->{cgi}= shift;
++	$self->{session}=0;
++	$self->{cookie}=0;
++	bless($self,$class);
++	return $self;
++}
++
++sub cookie{
++	my $self = shift;
++	if(@_) { $self->{cookie} = shift; }
++	return $self->{cookie};
++}
++
++sub param{
++	my $self = shift;
++	my $variable = shift;
++	if (@_){ return $self->{session}->param($variable,shift);}
++	else {return $self->{session}->param($variable);}
++}
++
++sub check{
++	my $self = shift;
++	my $ph = shift;
++	my ($u, $p) = ($ph->{'logUser'}, md5_hex($ph->{'logPass'}) );
++	my $id = Admin->check($u,$p);
++	if ( $id ) {
++		$self->param('logged_in',1);
++		$self->{session}->expires('logged_in',"+10m");
++		$self->param('user_name',$u);
++		$self->param('user_id',$id);
++		Logger->message("User logged in with user name $u");
++		return 1;
++	} else { return 0; }
++}
++
++sub changePass {
++	my $self = shift;
++	my $ph = shift;		# Param hash obtained with Vars() method
++	my ($o, $n1, $n2 ) = ($ph->{'oldPass'}, $ph->{'newPass'}, $ph->{'newPass2'});
++	my ($u, $id) = ( $self->param('user_name'), $self->param('user_id') );
++
++	if ( Admin->check($u, md5_hex($o)) && ($n1 eq $n2) && Admin->change($id, md5_hex($n1)) ){
++		Logger->message("Changed password for user $u");
++		return 1;
++	} else { return 0; } 
++}
++
++sub startSession{
++	my $self = shift;
++	my $cgi = $self->{cgi};
++	my $id = $cgi->cookie('CGISESSID') || $cgi->url_param('sid') || $cgi->param('sid') || undef;
++	$self->{session} = new CGI::Session(undef, $id, {Directory=>'/tmp'});
++	$self->{cookie} = $cgi->cookie(CGISESSID => $self->{session}->id);
++	Logger->message("NEW session. id=".$self->{session}->id) unless $id; # Log if new sessid
++}
++
++sub isLoggedIn{
++	my $self = shift;
++	return $self->{session}->param("logged_in");
++}
++
++sub logOut{
++	my $self = shift;
++	$self->{session}->delete();
++}
++
++1;
+
+
+
+From dasenjo at berlios.de  Mon Sep 19 17:37:28 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Mon, 19 Sep 2005 17:37:28 +0200
+Subject: [Tentaculo-svn] r10 - trunk
+Message-ID: <200509191537.j8JFbSaL028184@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-19 17:37:28 +0200 (Mon, 19 Sep 2005)
+New Revision: 10
+
+Removed:
+   trunk/sec/
+Log:
+The 'sec' directory is useless.
+
+
+
+
+From dasenjo at berlios.de  Tue Sep 20 22:49:54 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Tue, 20 Sep 2005 22:49:54 +0200
+Subject: [Tentaculo-svn] r11 - trunk/etc
+Message-ID: <200509202049.j8KKnsGg007523@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-20 22:49:53 +0200 (Tue, 20 Sep 2005)
+New Revision: 11
+
+Modified:
+   trunk/etc/
+Log:
+The squid.conf file in this directory does not have to be under version control.
+
+
+
+Property changes on: trunk/etc
+___________________________________________________________________
+Name: svn:ignore
+   + squid.conf
+
+
+
+
+From dasenjo at berlios.de  Wed Sep 21 23:01:04 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Wed, 21 Sep 2005 23:01:04 +0200
+Subject: [Tentaculo-svn] r12 - trunk/lib
+Message-ID: <200509212101.j8LL14RN027465@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-21 23:01:02 +0200 (Wed, 21 Sep 2005)
+New Revision: 12
+
+Removed:
+   trunk/lib/Secure.pm
+Log:
+This module is not needed. The 'secure stuff' is going to be executed
+in another perl script.
+
+
+Deleted: trunk/lib/Secure.pm
+===================================================================
+--- trunk/lib/Secure.pm	2005-09-20 20:49:53 UTC (rev 11)
++++ trunk/lib/Secure.pm	2005-09-21 21:01:02 UTC (rev 12)
+@@ -1,42 +0,0 @@
+-package Secure;
+-# This module execs all the commands that need root privs.
+-
+-use strict;
+-use POSIX;
+-
+-sub new{
+-	my $this = shift;
+-	my $class = ref($this) || $this;
+-	my $self = {};
+-	bless($self,$class);
+-	return $self;
+-}
+-
+-
+-sub getRoot{
+-	POSIX::setuid(0);
+-	delete @ENV{qw(IFS PATH CDPATH ENV BASH_ENV)};   # Make %ENV safer
+-
+-}
+-
+-sub startSquid{
+-	shift;
+-	my $start;
+-	my $uid = POSIX::getuid();
+-	&getRoot();
+-	system("/etc/init.d/squid","start","1>out 2>err");
+-	POSIX::setuid($uid);
+-	return $start;
+-}
+-
+-sub stopSquid{
+-	shift;
+-	my $stop;
+-	my $uid = POSIX::getuid();
+-	&getRoot();
+-	system("/etc/init.d/squid","stop") > $stop;
+-	POSIX::setuid($uid);
+-	return $stop;
+-}
+-
+-1;
+
+
+
+From dasenjo at berlios.de  Thu Sep 22 00:26:04 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Thu, 22 Sep 2005 00:26:04 +0200
+Subject: [Tentaculo-svn] r13 - in trunk: . lib
+Message-ID: <200509212226.j8LMQ44q001643@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-22 00:26:03 +0200 (Thu, 22 Sep 2005)
+New Revision: 13
+
+Added:
+   trunk/lib/Status.pm
+   trunk/sec.pl
+Modified:
+   trunk/index.pl
+   trunk/lib/SessionControl.pm
+Log:
+* AccessControl changed by SessionControl
+* Status section is almost complete.
+* Added sec.pl to execute the root privileged operations.
+* Added clear method in SessionControl module
+
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-21 21:01:02 UTC (rev 12)
++++ trunk/index.pl	2005-09-21 22:26:03 UTC (rev 13)
+@@ -15,23 +15,25 @@
+ my $phr = $cgi->Vars;		# All (p)arams (h)ash (r)eference
+ 
+ # General system general modules.
+-use AccessControl;
++use SessionControl;
+ use Logger;
+ use Template;
+-my $ac = AccessControl->new($cgi);
+-$ac->startSession();		# Start a new session or recover an started one.
++my $sc = SessionControl->new($cgi);
++$sc->startSession();		# Start a new session or recover an started one.
+ 
+ # Per-section modules and their objects.
+ use General;
+ use Cache;
++use Status;
+ my $gen = General->new();
+ my $cach = Cache->new();
++my $stat = Status->new();
+ 
+ # HTML Page variables. t = template. c = content (or template fill).
+ my ($t,$c);
+ 
+ # Start to check user and process status and petitions.
+-if ( $ac->isLoggedIn() ){
++if ( $sc->isLoggedIn() ){
+ 	# The user is logged in. Get the principal params.
+ 	my $sect = $phr->{'sect'} || $cgi->url_param('sect') || 'status';
+ 	my $sub = $phr->{'sub'} || $cgi->url_param('sub') || '';
+@@ -51,12 +53,10 @@
+ 	# Choose the section and call the proper methods in the control objects.
+ 	if ( $sect eq 'status' ) {
+ 		#-- Status section --#
+-		if($sub eq 'squid'){
+-			# squid subsection 
+-			if ( $act eq 'start' ) {
+-				$c = Secure->startSquid();
+-			}
+-		}	
++		my $s = $sc->param("status");
++		print $cgi->redirect("sec.pl?act=status") unless $s;
++		$c = $stat->load($c, $s);
++		$sc->clear("status");		# clear the status param in the session.
+ 	} elsif ( $sect eq 'general' ) {
+ 		#-- General section --#
+ 		$c = $gen->load($c) unless $act;
+@@ -101,21 +101,20 @@
+ 		if($sub eq 'password'){
+ 			# Password subsection 
+ 			if ( $act eq 'change' ) {
+-				$c = Template->result($ac->changePass($phr), $sect, $sub);
++				$c = Template->result($sc->changePass($phr), $sect, $sub);
+ 			}
+ 		}	
+ 	} elsif ( $sect eq 'logout' ) {
+-		$ac->logOut();
+-		$t = Template->read('login');	
++		$sc->logOut();
++		print $cgi->redirect("index.pl");
+ 	}
+ } else {
+ 	# The user is not logged in
+ 	if ($phr->{'logUser'}) {
+ 		# The user is trying to log in.
+-		if ( $ac->check($phr) ) {
++		if ( $sc->check($phr) ) {
+ 			# The user logged in.
+-			$t = Template->read('admin');
+-			$c = Template->read('status');
++			print $cgi->redirect("index.pl");
+ 		} else {
+ 			# The user failed trying to log in.
+ 			$t = Template->read('login');
+@@ -129,7 +128,7 @@
+ 
+ $t =~ s/<!-- CONTENT -->/$c/ if $t;
+ 
+-print $cgi->header(-cookie=>$ac->cookie); 
++print $cgi->header(-cookie=>$sc->cookie); 
+ print $t if $t;
+ 
+-Logger->error("The is no page to print!") unless $t;
++Logger->error("There is no page to print!\n") unless $t;
+
+Modified: trunk/lib/SessionControl.pm
+===================================================================
+--- trunk/lib/SessionControl.pm	2005-09-21 21:01:02 UTC (rev 12)
++++ trunk/lib/SessionControl.pm	2005-09-21 22:26:03 UTC (rev 13)
+@@ -28,9 +28,15 @@
+ 	my $self = shift;
+ 	my $variable = shift;
+ 	if (@_){ return $self->{session}->param($variable,shift);}
+-	else {return $self->{session}->param($variable);}
++	else {my $ret = $self->{session}->param($variable) || '' ; return $ret; }
+ }
+ 
++sub clear{
++	my $self = shift;
++	my $variable = shift;
++	return $self->{session}->clear($variable);
++}
++
+ sub check{
+ 	my $self = shift;
+ 	my $ph = shift;
+
+Added: trunk/lib/Status.pm
+===================================================================
+--- trunk/lib/Status.pm	2005-09-21 21:01:02 UTC (rev 12)
++++ trunk/lib/Status.pm	2005-09-21 22:26:03 UTC (rev 13)
+@@ -0,0 +1,29 @@
++package Status;
++
++use strict;
++use Logger;
++
++sub new{
++	my $this = shift;
++	my $class = ref($this) || $this;
++	my $self = {};
++	bless($self,$class);
++	return $self;
++}
++
++sub load{
++	shift;
++	my ($c, $s) = @_;
++
++	my $sys = $s->{sys} ? _("controlling squid") : _("not controlling squid");
++	$c =~ s/<!-- SYS-STATUS -->/$sys/;
++
++	$c =~ s/<!-- CHANGES -->/$s->{changes}/ if $s->{changes};
++
++	my $squ = $s->{squ} ? _("running") : _("stopped");
++	$c =~ s/<!-- SQ-STATUS -->/$squ/;
++
++	return $c;
++}
++
++1;
+
+
+Property changes on: trunk/lib/Status.pm
+___________________________________________________________________
+Name: svn:executable
+   + *
+
+Added: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-09-21 21:01:02 UTC (rev 12)
++++ trunk/sec.pl	2005-09-21 22:26:03 UTC (rev 13)
+@@ -0,0 +1,50 @@
++#!/usr/bin/perl -wT
++# Script that executes root privileged operations.
++#
++
++# Always use strict. Application modules are in the 'lib' directory.
++use strict;
++use lib './lib';
++
++# General system general modules.
++use CGI;
++use POSIX;
++use SessionControl;
++use Logger;
++
++my $cgi = new CGI;
++my $sc = SessionControl->new($cgi);
++$sc->startSession();		# Start a new session or recover an started one.
++
++if ( $sc->isLoggedIn() ){
++	my $uid = POSIX::getuid();
++	my $act = $cgi->url_param('act');
++
++	if($act && $act eq 'status'){
++		my $s = { sys => 0, cha => 0, squ => 0};
++		&getRoot() or Logger->error("Can't get root privileges");
++
++		# Compare the files to check if the system is controlling squid.
++		$s->{sys} = 1 unless `diff etc/squid.conf /etc/squid/squid.conf`;
++
++		# Is squid running?
++		$s->{squ} = 1 if `pgrep squid`;
++
++		POSIX::setuid($uid); 		# Hold privileges.
++		$sc->param('status', $s);
++	}
++} else {
++	# An error. This script should not be called without being logged in.
++	Logger->error("sec.pl: the user is  not logged in. This should not happen!"); die $!;
++}
++
++print $cgi->redirect("index.pl");
++
++sub getRoot{
++	shift;
++	POSIX::setuid(0) or Logger->message($!);
++	delete @ENV{qw(IFS PATH CDPATH ENV BASH_ENV)};   # Make %ENV safer
++	return 1 if POSIX::getuid() == 0;
++	return 0;
++}
++
+
+
+Property changes on: trunk/sec.pl
+___________________________________________________________________
+Name: svn:executable
+   + *
+
+
+
+From dasenjo at berlios.de  Thu Sep 22 11:12:56 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Thu, 22 Sep 2005 11:12:56 +0200
+Subject: [Tentaculo-svn] r14 - in trunk: . lib log
+Message-ID: <200509220912.j8M9Cul2024021@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-22 11:12:55 +0200 (Thu, 22 Sep 2005)
+New Revision: 14
+
+Added:
+   trunk/log/
+   trunk/log/errors
+   trunk/log/messages
+Modified:
+   trunk/lib/Logger.pm
+Log:
+The logs are now stored in the 'log' directory.
+
+
+Modified: trunk/lib/Logger.pm
+===================================================================
+--- trunk/lib/Logger.pm	2005-09-21 22:26:03 UTC (rev 13)
++++ trunk/lib/Logger.pm	2005-09-22 09:12:55 UTC (rev 14)
+@@ -3,15 +3,11 @@
+ use strict;
+ use Carp;
+ 
+-my $logdir  = "/var/log/tentaculo/";
+-my $logfile = $logdir."messages";
+-my $errfile = $logdir."errors";
+-
+ sub message {
+ 	# Writes a message log entry.
+-	my $self = shift;
++	shift;
+ 	my $message = shift;
+-	open REG, ">>".$logfile or die "Could not open file: ".$!;
++	open REG, ">>log/messages" or die "Could not open file: ".$!;
+ 	print REG localtime()." ".$message."\n";
+ 	close(REG) or die "Could not close file:  ".$!;
+ }
+@@ -21,7 +17,7 @@
+ 	shift;
+ 	my $message = shift;
+ 	print STDERR "Logging error: ".$message;
+-	open REG, ">>".$errfile or die "Could not open file:  ".$!;
++	open REG, ">>log/errors" or die "Could not open file:  ".$!;
+ 	print REG Carp::longmess(localtime()." ".$message."\n");
+ 	close(REG) or die "Could not close file: ".$!;
+ }
+
+
+Property changes on: trunk/log
+___________________________________________________________________
+Name: svn:ignore
+   + messages
+errors
+
+
+Added: trunk/log/errors
+===================================================================
+
+Added: trunk/log/messages
+===================================================================
+--- trunk/log/messages	2005-09-21 22:26:03 UTC (rev 13)
++++ trunk/log/messages	2005-09-22 09:12:55 UTC (rev 14)
+@@ -0,0 +1,2 @@
++Thu Sep 22 04:11:54 2005 NEW session. id=80328910f073fbb48671233bda032382
++Thu Sep 22 04:11:54 2005 file: templates/es/login.html
+
+
+
+From dasenjo at berlios.de  Thu Sep 22 11:22:41 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Thu, 22 Sep 2005 11:22:41 +0200
+Subject: [Tentaculo-svn] r15 - trunk/log
+Message-ID: <200509220922.j8M9MfDG024759@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-22 11:22:41 +0200 (Thu, 22 Sep 2005)
+New Revision: 15
+
+Modified:
+   trunk/log/errors
+   trunk/log/messages
+Log:
+
+
+Modified: trunk/log/errors
+===================================================================
+--- trunk/log/errors	2005-09-22 09:12:55 UTC (rev 14)
++++ trunk/log/errors	2005-09-22 09:22:41 UTC (rev 15)
+@@ -0,0 +1 @@
++akljsdkajs
+
+Modified: trunk/log/messages
+===================================================================
+--- trunk/log/messages	2005-09-22 09:12:55 UTC (rev 14)
++++ trunk/log/messages	2005-09-22 09:22:41 UTC (rev 15)
+@@ -1,2 +1,3 @@
+ Thu Sep 22 04:11:54 2005 NEW session. id=80328910f073fbb48671233bda032382
+ Thu Sep 22 04:11:54 2005 file: templates/es/login.html
++Thu Sep 22 04:17:13 2005 file: templates/es/login.html
+
+
+
+From dasenjo at berlios.de  Thu Sep 22 11:28:02 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Thu, 22 Sep 2005 11:28:02 +0200
+Subject: [Tentaculo-svn] r16 - trunk/log
+Message-ID: <200509220928.j8M9S2xr025038@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-22 11:28:01 +0200 (Thu, 22 Sep 2005)
+New Revision: 16
+
+Removed:
+   trunk/log/errors
+   trunk/log/messages
+Log:
+The files in the 'log' directory doesn't need to be under version control.
+
+
+Deleted: trunk/log/errors
+===================================================================
+--- trunk/log/errors	2005-09-22 09:22:41 UTC (rev 15)
++++ trunk/log/errors	2005-09-22 09:28:01 UTC (rev 16)
+@@ -1 +0,0 @@
+-akljsdkajs
+
+Deleted: trunk/log/messages
+===================================================================
+--- trunk/log/messages	2005-09-22 09:22:41 UTC (rev 15)
++++ trunk/log/messages	2005-09-22 09:28:01 UTC (rev 16)
+@@ -1,3 +0,0 @@
+-Thu Sep 22 04:11:54 2005 NEW session. id=80328910f073fbb48671233bda032382
+-Thu Sep 22 04:11:54 2005 file: templates/es/login.html
+-Thu Sep 22 04:17:13 2005 file: templates/es/login.html
+
+
+
+From dasenjo at berlios.de  Sun Sep 25 01:12:28 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Sun, 25 Sep 2005 01:12:28 +0200
+Subject: [Tentaculo-svn] r18 - trunk/elements
+Message-ID: <200509242312.j8ONCSK7008022@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-25 01:12:24 +0200 (Sun, 25 Sep 2005)
+New Revision: 18
+
+Removed:
+   trunk/elements/jsval.js
+   trunk/elements/validator.js
+Log:
+Javascript validation files that are not being used.
+
+
+
+Deleted: trunk/elements/jsval.js
+===================================================================
+--- trunk/elements/jsval.js	2005-09-24 21:57:04 UTC (rev 17)
++++ trunk/elements/jsval.js	2005-09-24 23:12:24 UTC (rev 18)
+@@ -1,437 +0,0 @@
+-/* FILE HEADER **************************************************
+-** JS Validate
+-** Author: Karl Seguin, Timo Haberkern
+-** Homepage: http://jsval.berlios.de/
+-** Version: 1.3.3
+-** Copyright 2003, 2005 Timo Haberkern, Karl Seguin
+-
+-    This file is part of JS Validate.
+-
+-    JS Validate is free software; you can redistribute it and/or modify
+-    it under the terms of the GNU Lesser General Public License as published by
+-    the Free Software Foundation; either version 2 of the License, or
+-    (at your option) any later version.
+-
+-    JS Validate is distributed in the hope that it will be useful,
+-    but WITHOUT ANY WARRANTY; without even the implied warranty of
+-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-    GNU General Public License for more details.
+-
+-    You should have received a copy of the GNU Lesser General Public License
+-    along with JS Validate; if not, write to the Free Software
+-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+-**
+-** END HEADER ***************************************************/
+-
+-function validateCompleteForm (objForm, strErrorClass) {
+-    return _validateInternal(objForm, strErrorClass, 0);
+-};
+-
+-function validateStandard (objForm, strErrorClass) {
+-    return _validateInternal(objForm, strErrorClass, 1);
+-};
+-
+-/***************************************************************
+-** Internal functions
+-*****************************************************************/
+-function _validateInternal(form, strErrorClass, nErrorThrowType){
+-   var strErrorMessage = ""; var objFirstError = null;
+-   if (nErrorThrowType == 0){
+-    strErrorMessage = (form.err) ? form.err : _getLanguageText("err_form");
+-   };
+-
+-   var fields = _GenerateFormFields(form);
+-   for (var i = 0; i < fields.length; ++i){
+-      var field = fields[i];
+-      if (!field.IsValid(fields)){
+-        field.SetClass(strErrorClass);
+-        if (nErrorThrowType == 1) {
+-            _throwError(field);
+-            return false;
+-        }else{
+-            if (objFirstError == null){
+-               objFirstError = field;
+-            }
+-            strErrorMessage = _handleError (field, strErrorMessage);
+-            bError = true;
+-        }
+-      } else {
+-      	field.ResetClass();
+-      }
+-   };
+-   if (objFirstError != null) {
+-      alert(strErrorMessage);
+-      objFirstError.element.focus();
+-      return false;
+-  };
+-  return true;
+- };
+-
+- function _getLanguageText(id){
+-    objTextsInternal = new _jsVal_Language();
+-    objTexts = null;
+-    try {
+-        objTexts = new jsVal_Language();
+-    } catch (ignored){};
+-    switch (id) {
+-        case "err_form": strResult = (!objTexts || !objTexts.err_form) ? objTextsInternal.err_form : objTexts.err_form; break;
+-        case "err_enter": strResult = (!objTexts || !objTexts.err_enter) ? objTextsInternal.err_enter : objTexts.err_enter; break;
+-        case "err_select": strResult = (!objTexts || !objTexts.err_select) ? objTextsInternal.err_select : objTexts.err_select; break;
+-    };
+-    return strResult;
+- };
+-
+- function _GenerateFormFields(form){
+-   var arr = new Array();
+-   for (var i = 0; i < form.length; ++i){
+-      var element = form.elements[i];
+-      
+-      
+-      var index = _getElementIndex(arr,element);
+-      //if it doesn't already exist, add it to our array, else merge the change
+-      if (index == -1){
+-         arr[arr.length] = new Field(element, form);
+-      }else{
+-         arr[index].Merge(element)
+-      };
+-   };
+-   return arr;
+-};
+-
+-function _getElementIndex(arr, element){
+-   if (element.name) {
+-       var elementName = element.name.toLowerCase();
+-       for (var i = 0; i < arr.length; ++i){
+-       	  if (arr[i].element.name) { 
+-			   if (arr[i].element.name.toLowerCase() == elementName){
+-               	  return i;
+-               }
+-          };
+-       };
+-   }
+-   return -1;
+-};
+-
+-/***************************************************************
+-** Standard translation
+-*****************************************************************/
+-function _jsVal_Language() {
+-    this.err_form = "Please enter/select values for the following fields:\n\n";
+-    this.err_select = "Please select a valid \"%FIELDNAME%\"";
+-    this.err_enter = "Please enter a valid \"%FIELDNAME%\"";
+-};
+-
+-/***************************************************************
+-** Field Class
+-*****************************************************************/
+-function Field(element, form){
+-   this.type = element.type;
+-   this.element = element;
+-   this.exclude = element.exclude || element.getAttribute('exclude');
+-   this.err = element.err || element.getAttribute('err');
+-   this.required = _parseBoolean(element.required || element.getAttribute('required'));
+-   this.realname = element.realname || element.getAttribute('realname');
+-   this.elements = new Array();
+-   
+-   switch (this.type){
+-      case "textarea":
+-      case "password":
+-      case "text":
+-      case "file":
+-         this.value = element.value;
+-         this.minLength = element.minlength || element.getAttribute('minlength');
+-         this.maxLength = element.maxlength || element.getAttribute('maxlength');
+-         this.regexp = this._getRegEx(element);
+-         this.minValue = element.minvalue || element.getAttribute('minvalue');
+-         this.maxValue = element.maxvalue || element.getAttribute('maxvalue');
+-         this.equals = element.equals || element.getAttribute('equals');
+-         this.callback = element.callback || element.getAttribute('callback');
+-         break;
+-      case "select-one":
+-      case "select-multiple":
+-         this.values = new Array();
+-         for (var i = 0; i < element.options.length; ++i){
+-            if (element.options[i].selected && (!this.exclude || element.options[i].value != this.exclude)){
+-               this.values[this.values.length] = element.options[i].value;
+-            }
+-         }
+-         this.min = element.min || element.getAttribute('min');
+-         this.max = element.max || element.getAttribute('max');
+-         this.equals = element.equals || element.getAttribute('equals');
+-         break;
+-      case "checkbox":
+-         this.min = element.min || element.getAttribute('min');
+-         this.max = element.max || element.getAttribute('max');
+-         //no break, let it fall through to radio
+-      case "radio":
+-          this.required = _parseBoolean(this.required || element.getAttribute('required'));
+-          this.values = new Array();
+-          if (element.checked){
+-             this.values[0] = element.value;
+-          }
+-   		         
+-          this.elements[0] = element;
+-          break;
+-   };
+-};
+-Field.prototype.Merge = function(element){
+-   //never negate a require field
+-   var required = _parseBoolean(element.getAttribute('required'));
+-   if (required){
+-      this.required = true;
+-   };
+-   //all other cases (except required) we only add if there isn't already a value (first come first served)
+-   if (!this.err){
+-      this.err = element.getAttribute('err');
+-   };
+-   if (!this.equals){
+-   	  this.equals = element.getAttribute('equals');
+-   };
+-   if (!this.callback){
+-   	  this.callback = element.getAttribute('callback');
+-   };
+-   if (!this.realname){
+-      this.realname = element.getAttribute('realname');
+-   };
+-   if (!this.max){
+-      this.max = element.getAttribute('max');
+-   };
+-   if (!this.min){
+-      this.min = element.getAttribute('min');
+-   };
+-   if (!this.regexp){
+-      this.regexp = this._getRegEx(element);
+-   };
+-   if (element.checked){
+-      this.values[this.values.length] = element.value;
+-   };
+-   this.elements[this.elements.length] = element;
+-};
+-Field.prototype.IsValid = function(arrFields){
+-   switch (this.type){
+-      case "textarea":
+-      case "password":
+-      case "text":
+-      case "file":
+-         return this._ValidateText(arrFields);
+-      case "select-one":
+-      case "select-multiple":
+-      case "radio":
+-      case "checkbox":
+-         return this._ValidateGroup(arrFields);
+-      default:
+-         return true;
+-   };
+-};
+-Field.prototype.SetClass = function(newClassName){
+-   if ( (newClassName) && (newClassName != "") ) {
+-       if ( (this.elements) && (this.elements.length > 0)) {
+-          for (var i = 0; i < this.elements.length; ++i){
+-          	  if(this.elements[i].className != newClassName){
+-                this.elements[i].oldClassName = this.elements[i].className;
+-                this.elements[i].className = newClassName;
+-              }
+-          }
+-       }else{
+-       	  if(this.element.className != newClassName){
+-            this.element.oldClassName = this.element.className;
+-            this.element.className = newClassName;
+-          }
+-       };
+-   }
+-};
+-Field.prototype.ResetClass = function(){
+-	if ( (this.type != "button") && (this.type != "submit") && (this.type != "reset") ) {
+-   		if ( (this.elements) && (this.elements.length > 0)) {
+-      		for (var i = 0; i < this.elements.length; ++i){
+-      			if(this.elements[i].oldClassName){
+-         	 	  this.elements[i].className = this.elements[i].oldClassName;
+-         	 	}
+-         	 	else {
+-    	  	 	  this.element.className = "";
+-    	  		}
+-      		}
+-   		}else{
+-   			if(this.elements.oldClassName){
+-    	  	  this.element.className = this.element.oldClassName;
+-    	  	}
+-    	  	else {
+-    	  	  this.element.className = "";
+-    	  	}
+-   		};
+-	};
+-};
+-Field.prototype._getRegEx = function(element){
+-   regex = element.regexp || element.getAttribute('regexp')
+-   if (regex == null) return null;
+-   retype = typeof(regex);
+-   if (retype.toUpperCase() == "FUNCTION")
+-       return regex;
+-   else if ( (retype.toUpperCase() == "STRING") && !(regex == "JSVAL_RX_EMAIL") && !(regex == "JSVAL_RX_TEL")
+-   				&& !(regex == "JSVAL_RX_PC") && !(regex == "JSVAL_RX_ZIP") && !(regex == "JSVAL_RX_MONEY") 
+-				&& !(regex == "JSVAL_RX_CREDITCARD") && !(regex == "JSVAL_RX_POSTALZIP"))
+-   {
+-       nBegin = 0; nEnd = regex.length-1;
+-       if (regex.charAt(0) == "/") nBegin=1;
+-       if (regex.charAt(regex.length-1) == "/") nEnd=regex.length-2;
+-	   
+-       return new RegExp(regex.slice(nBegin, nEnd));
+-   }
+-   else {
+-       return regex;
+-   };
+-};
+-Field.prototype._ValidateText = function(arrFields){
+-   if ( (this.required) && (this.callback) ) {
+-   	  nCurId = this.element.id ? this.element.id : "";
+-   	  nCurName = this.element.name ? this.element.name : "";
+-   	  
+-   	  eval("bResult = "+this.callback+"('"+nCurId+"', '"+nCurName+"', '"+this.value+"');"); 
+-   	  if (bResult == false) {
+-   	  	 return false;
+-   	  };
+-   } else {	
+-	   //required value is empty
+-	   if (this.required && !this.value){
+-	      return false;
+-	   };
+-	   //value less than minlength
+-	   if (this.value && (this.minLength && this.value.length < this.minLength)){
+-	      return false;
+-	   };
+-	   //value is more than maxlength
+-	   if (this.value && (this.maxLength && this.value.length > this.maxLength)){
+-	      return false;
+-	   };
+-	   //value fails regular expression
+-	   if (this.regexp){
+-	   	  if (!_checkRegExp(this.regexp, this.value))
+-	   	  {
+-	   	  	  //the field isn't required, but there is a value
+-		      if (!this.required && this.value){
+-		         return false;
+-		      }
+-		      if (this.required){
+-		         return false;
+-		      }
+-	   	  }
+-	   	  else
+-	   	  {
+-	   	  	return true;
+-	   	  };
+-	   };
+-	   
+-	   
+-	   
+-	   //check equality
+-	   if (this.equals){
+-	   	   for (var i = 0; i < arrFields.length; ++i){
+-	       	   var field = arrFields[i];
+-	       	   if ( (field.element.name == this.equals) || (field.element.id == this.equals) ) {
+-	       	   	  if (field.element.value != this.value) {
+-	       	   	  	 return false;
+-	       	   	  };
+-	       	   	  break;
+-	       	   };
+-	       };
+-	   };
+-	   
+-	   //check against minvalue and maxvalue
+-	   if (this.required){
+-	      var fValue = parseFloat(this.value);
+-	      if ((this.minValue || this.maxValue) && isNaN(fValue)){
+-	         return false;
+-	      };
+-	      if ( (this.minValue) && (fValue < this.minValue) ) {
+-	         return false;
+-	      };
+-	      if ( (this.maxValue) && (fValue > this.maxValue) ) {
+-	         return false
+-	      };
+-	   };
+-   }
+-   return true;
+-};
+-Field.prototype._ValidateGroup = function(arrFields){
+-   if (this.required && this.values.length == 0){
+-      return false;
+-   };
+-   if (this.required && this.min && this.min > this.values.length){
+-      return false;
+-   };
+-   if (this.required && this.max && this.max < this.values.length){
+-      return false;
+-   };
+-   return true;
+-};
+-
+-function _handleError (field, strErrorMessage) {
+-   var obj = field.element;
+-   strNewMessage = strErrorMessage + ( (field.realname)? field.realname : ((obj.id) ? obj.id : obj.name) ) + "\n";
+-   return strNewMessage;
+-};
+-
+-function _throwError(field){
+-   var obj = field.element;
+-   switch (field.type){
+-      case "text":
+-      case "password":
+-      case "textarea":
+-      case "file":
+-         alert(_getError(field, "err_enter"));
+-         try {
+-         	obj.focus();
+-         }
+-         catch (ignore) {}
+-         break;
+-      case "select-one":
+-      case "select-multiple":
+-      case "radio":
+-      case "checkbox":
+-         alert(_getError(field, "err_select"));
+-         break;
+-      };
+-};
+-
+-function _getError(field, str){
+-   var obj = field.element;
+-   strErrorTemp = (field.err) ? field.err : _getLanguageText(str);
+-   
+-   idx = strErrorTemp.indexOf( "\\n" );
+-   while ( idx > -1 ) {
+-   	strErrorTemp = strErrorTemp.replace( "\\n", "\n" );
+-    idx = strErrorTemp.indexOf( "\\n" );
+-   };
+-   
+-   return strErrorTemp.replace("%FIELDNAME%", (field.realname)? field.realname : ((obj.id) ? obj.id : obj.name));
+-};
+-
+-function _parseBoolean(value){
+-   return !(!value || value == 0 || value == "0" || value == "false");
+-};
+-
+-function _checkRegExp(regx, value){
+-  switch (regx){
+-  case "JSVAL_RX_EMAIL":
+-    return ((/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,5})+$/).test(value));
+-  case "JSVAL_RX_TEL":
+-    return ((/^1?[\- ]?\(?\d{3}\)?[\- ]?\d{3}[\- ]?\d{4}$/).test(value));
+-  case "JSVAL_RX_PC":
+-    return ((/^[a-z]\d[a-z] ?\d[a-z]\d$/i).test(value));
+-  case "JSVAL_RX_ZIP":
+-    return ((/^\d{5}$/).test(value));
+-  case "JSVAL_RX_MONEY":
+-    return ((/^\d+([\.]\d\d)?$/).test(value));
+-  case "JSVAL_RX_CREDITCARD":
+-    return (!isNaN(value));
+-  case "JSVAL_RX_POSTALZIP":
+-    if(value.length == 6 || value.length == 7)
+-      return((/^[a-zA-Z]\d[a-zA-Z] ?\d[a-zA-Z]\d$/).test(value));
+-    if(value.length == 5 || value.length == 10)
+-      return((/^\d{5}(\-\d{4})?$/).test(value));
+-    break;
+-  default:
+-    return (regx.test(value));
+-
+-  };
+-};
+\ No newline at end of file
+
+Deleted: trunk/elements/validator.js
+===================================================================
+--- trunk/elements/validator.js	2005-09-24 21:57:04 UTC (rev 17)
++++ trunk/elements/validator.js	2005-09-24 23:12:24 UTC (rev 18)
+@@ -1,64 +0,0 @@
+-    // Validator Object
+-    var valid = new Object();
+-
+-    // REGEX Elements
+-
+-        // matches zip codes
+-        valid.zipCode = /\d{5}(-\d{4})?/;
+-
+-        // matches $17.23 or $14,281,545.45 or ...
+-        valid.Currency = /\$\d{1,3}(,\d{3})*\.\d{2}/;
+-
+-        // matches 5:04 or 12:34 but not 75:83
+-        valid.Time = /^([1-9]|1[0-2]):[0-5]\d$/;
+-
+-        //matches email
+-        valid.emailAddress = /^.+\@(\[?)[a-zA-Z0-9\-\.]+\.([a-zA-Z]{2,3}|[0-9]{1,3})(\]?)$/;
+-
+-        // matches phone ###-###-####
+-        valid.phoneNumber = /^\(?\d{3}\)?\s|-\d{3}-\d{4}$/;
+-
+-        // International Phone Number
+-        valid.phoneNumberInternational = /^\d(\d|-){7,20}/;
+-
+-        // IP Address
+-        valid.ipAddress = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/;
+-
+-        // Date xx/xx/xxxx
+-        valid.Date = /^\d{1,2}(\-|\/|\.)\d{1,2}\1\d{4}$/;
+-
+-        // State Abbreviation
+-        valid.State = /^(AK|AL|AR|AZ|CA|CO|CT|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NB|NC|ND|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY)$/i;
+-
+-        // Social Security Number
+-        valid.SSN = /^\d{3}\-\d{2}\-\d{4}$/;
+-
+-    
+-    function validateForm(theForm) {
+-
+-        var elArr = theForm.elements; 
+-
+-        for(var i = 0; i < elArr.length; i++) {
+-
+-           with(elArr[i]) { 
+-
+-              var v = elArr[i].validator; 
+-
+-              if(!v) continue; 
+-
+-              var thePat = valid[v]; 
+-
+-              var gotIt = thePat.exec(value); 
+-
+-              if(! gotIt){
+-                 alert(name + ": failure to match " + v + " to " + value);                  
+-                 elArr[i].select();
+-                 elArr[i].focus(); 
+-                 return false;
+-              }
+-           }
+-        }
+-
+-        return true;
+-
+-    }
+\ No newline at end of file
+
+
+
+From dasenjo at berlios.de  Mon Sep 26 23:25:45 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Mon, 26 Sep 2005 23:25:45 +0200
+Subject: [Tentaculo-svn] r19 - in trunk: . doc lib
+Message-ID: <200509262125.j8QLPjxd008858@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-26 23:25:44 +0200 (Mon, 26 Sep 2005)
+New Revision: 19
+
+Modified:
+   trunk/doc/INSTALL
+   trunk/index.pl
+   trunk/lib/Cache.pm
+   trunk/lib/SquidControl.pm
+   trunk/lib/Status.pm
+   trunk/sec.pl
+Log:
+The configuration file is writed in etc.
+
+
+
+Modified: trunk/doc/INSTALL
+===================================================================
+--- trunk/doc/INSTALL	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/doc/INSTALL	2005-09-26 21:25:44 UTC (rev 19)
+@@ -7,7 +7,7 @@
+   webserver. Change the group that own the files by the webserver group and give 
+   write privileges to it (You need root privileges to execute these operations.):
+   
+-  # chgrp www-data/*; chmod g+w log/*
++  # chgrp www-data log/*; chmod g+w log/*
+ 
+   www-data is the default webserver groupname in Debian, the groupname depends on
+   each distribution.
+@@ -15,7 +15,8 @@
+ * Copy the contents of the misc/apache.conf in the apache configuration file. 
+   The file is based on Debian defaults. Change /var/www to your DocumentRoot.
+   You can add an 'Include /path/to/tentaculo/misc/apache.conf' line in the apache
+-  configuration file too.
++  configuration file too. You can also copy the apache.conf file as tentaculo.conf 
++  in the /etc/apache/conf.d/ directory.
+ 
+ * Import the default database from misc/tentaculo.sql into a mysql 4.0 server and 
+   create an account with all data privileges (Select, Insert, Update and Delete) 
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/index.pl	2005-09-26 21:25:44 UTC (rev 19)
+@@ -18,8 +18,10 @@
+ use SessionControl;
+ use Logger;
+ use Template;
++use SquidControl;
+ my $sc = SessionControl->new($cgi);
+ $sc->startSession();		# Start a new session or recover an started one.
++my $squc = SquidControl->new();
+ 
+ # Per-section modules and their objects.
+ use General;
+@@ -55,7 +57,7 @@
+ 		#-- Status section --#
+ 		my $s = $sc->param("status");
+ 		print $cgi->redirect("sec.pl?act=status") unless $s;
+-		$c = $stat->load($c, $s);
++		$c = $stat->load($c, $s) if $s;
+ 		$sc->clear("status");		# clear the status param in the session.
+ 	} elsif ( $sect eq 'general' ) {
+ 		#-- General section --#
+@@ -114,7 +116,7 @@
+ 		# The user is trying to log in.
+ 		if ( $sc->check($phr) ) {
+ 			# The user logged in.
+-			print $cgi->redirect("index.pl");
++			print $cgi->redirect('index.pl');
+ 		} else {
+ 			# The user failed trying to log in.
+ 			$t = Template->read('login');
+@@ -126,9 +128,9 @@
+ 	}
+ } 
+ 
+-$t =~ s/<!-- CONTENT -->/$c/ if $t;
++# Write the configuration file locally.
++$squc->writeFile();
+ 
+-print $cgi->header(-cookie=>$sc->cookie); 
+-print $t if $t;
+-
+-Logger->error("There is no page to print!\n") unless $t;
++# Replace the content in the template and print it if exists, else log an error.
++$t =~ s/<!-- CONTENT -->/$c/ if ($t && $c);
++print $cgi->header(-cookie=>$sc->cookie),$t if $t; 
+
+Modified: trunk/lib/Cache.pm
+===================================================================
+--- trunk/lib/Cache.pm	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/lib/Cache.pm	2005-09-26 21:25:44 UTC (rev 19)
+@@ -96,7 +96,7 @@
+ 
+ 	# cMem must be an integer (could be in Mb).
+ 	my $cmem = $ph->{cMem};
+-	push(@tags,'cMem') unless $cmem =~ /^\d+(Mb)?$/;
++	push(@tags,'cMem') unless $cmem =~ /^\d+( MB)?$/;
+ 
+ 	return \@tags if @tags;
+ 	return 0;
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/lib/SquidControl.pm	2005-09-26 21:25:44 UTC (rev 19)
+@@ -15,10 +15,7 @@
+ 
+ sub writeFile{
+ 	shift;
+-	my $cont;		# The squid.conf file content
+-	$cont .= &header();
+-	$cont .= &general();
+-	$cont .= &cache();
++	my $cont = &header().&general().&cache().&acl();
+ 	open(FILE,">etc/squid.conf") or die "Error: ".$!;
+ 	print FILE $cont;
+ 	close(FILE);
+@@ -26,7 +23,7 @@
+ 
+ sub header {
+ 	shift;
+-	return 	"# File created by nc. Creation date: ".localtime()."\n".
++	return 	"# Created by tentaculo at ".localtime().".\n".
+ 		"#############################################################\n".
+ 		"#############################################################\n\n";
+ }
+@@ -38,19 +35,18 @@
+ 	$ret .= "# -----------------------------------------------------------\n";
+ 	$ret .= "#############################################################\n\n";
+ 	$g = General->getGeneral();
+-	foreach my $tag (@tags){  $ret .= &simpleTag($tag, $g->{$tag});  }
++	foreach my $tag (@tags){  $ret .= &simpleTag($tag, $g->{$tag}) if $g->{$tag}; }
+ 	return $ret;
+ }
+ 
+ sub cache {
+ 	shift;
+-	# hierarchy_stoplist and no_cache are squid recommended
+ 	my ($ret, $g);
+ 	$ret  =	"# CACHE OPTIONS\n";
+ 	$ret .= "# -----------------------------------------------------------\n";
+ 	$ret .= "#############################################################\n\n";
+ 	$ret .= &simpleTag('cache_mem', General->getCacheMem());
+-	# The following two tags are squid recomended
++	# hierarchy_stoplist and no_cache configurations are squid recommended
+ 	$ret .= &simpleTag('hierarchy_stoplist', 'cgi-bin ?');
+ 	$ret .=	"#  TAG: no_cache\n";
+ 	$ret .= "# -----------------------------------------------------------\n";
+@@ -58,16 +54,47 @@
+ 	$ret .= "no_cache deny QUERY\n\n";
+ 	
+ 	# Write a tag for each cache dir entrie.
+-	foreach (@{Cache_Dir->getAll}){  $ret .= &cacheDirTag($_->{directory}, $_->{size});  }
++	my $dirs = Cache_Dir->getAll();
++	if($dirs){ for (@{$dirs}){ $ret .= &cacheDirTag($_->{directory}, $_->{size}); } }
+ 	return $ret;
+ }
+ 
++sub acl {
++	shift;
++	my $ret;
++	$ret  =	"# ACCESS CONTROL\n";
++	$ret .= "# -----------------------------------------------------------\n";
++	$ret .= "#############################################################\n\n";
++	# Default values. Squid recommended.
++	$ret .= "acl all src 0.0.0.0/0.0.0.0\n";
++	$ret .= "acl manager proto cache_object\n";
++	$ret .= "acl localhost src 127.0.0.1/255.255.255.255\n";
++	$ret .= "acl to_localhost dst 127.0.0.0/8\n";
++	$ret .= "acl SSL_ports port 443 563	# https, snews\n";
++	$ret .= "acl SSL_ports port 873		# rsync\n";
++	$ret .= "acl Safe_ports port 80		# http\n";
++	$ret .= "acl Safe_ports port 21		# ftp\n";
++	$ret .= "acl Safe_ports port 443 563	# https, snews\n";
++	$ret .= "acl Safe_ports port 70		# gopher\n";
++	$ret .= "acl Safe_ports port 210		# wais\n";
++	$ret .= "acl Safe_ports port 1025-65535	# unregistered ports\n";
++	$ret .= "acl Safe_ports port 280		# http-mgmt\n";
++	$ret .= "acl Safe_ports port 488		# gss-http\n";
++	$ret .= "acl Safe_ports port 591		# filemaker\n";
++	$ret .= "acl Safe_ports port 777		# multiling http\n";
++	$ret .= "acl Safe_ports port 631		# cups\n";
++	$ret .= "acl Safe_ports port 873		# rsync\n";
++	$ret .= "acl Safe_ports port 901		# SWAT\n";
++	$ret .= "acl purge method PURGE\n";
++	$ret .= "acl CONNECT method CONNECT\n";
++}
++
+ sub simpleTag {
+ 	my $ret;
+ 	my ($tag, $value) = @_;
+ 	$ret  =	"#  TAG: $tag\n";
+ 	$ret .= "# -----------------------------------------------------------\n";
+-	$ret .= "$tag = $value\n\n";
++	$ret .= "$tag $value\n\n";
+ 	return $ret;
+ }
+ 
+@@ -80,9 +107,4 @@
+ 	return $ret;
+ }
+ 
+-sub isRunning{
+-	shift;
+-	open(SQ,"</var/run/squid.conf");
+-	my $pid = <SQ>;
+-}
+ 1;
+
+Modified: trunk/lib/Status.pm
+===================================================================
+--- trunk/lib/Status.pm	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/lib/Status.pm	2005-09-26 21:25:44 UTC (rev 19)
+@@ -18,8 +18,6 @@
+ 	my $sys = $s->{sys} ? _("controlling squid") : _("not controlling squid");
+ 	$c =~ s/<!-- SYS-STATUS -->/$sys/;
+ 
+-	$c =~ s/<!-- CHANGES -->/$s->{changes}/ if $s->{changes};
+-
+ 	my $squ = $s->{squ} ? _("running") : _("stopped");
+ 	$c =~ s/<!-- SQ-STATUS -->/$squ/;
+ 
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-09-24 23:12:24 UTC (rev 18)
++++ trunk/sec.pl	2005-09-26 21:25:44 UTC (rev 19)
+@@ -20,6 +20,8 @@
+ 	my $uid = POSIX::getuid();
+ 	my $act = $cgi->url_param('act');
+ 
++	Logger->message("Called sec.pl");
++
+ 	if($act && $act eq 'status'){
+ 		my $s = { sys => 0, cha => 0, squ => 0};
+ 		&getRoot() or Logger->error("Can't get root privileges");
+
+
+
+From dasenjo at berlios.de  Tue Sep 27 19:44:57 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Tue, 27 Sep 2005 19:44:57 +0200
+Subject: [Tentaculo-svn] r20 - in trunk: . lib templates/es
+Message-ID: <200509271744.j8RHivUs024846@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-27 19:44:55 +0200 (Tue, 27 Sep 2005)
+New Revision: 20
+
+Modified:
+   trunk/index.pl
+   trunk/lib/General.pm
+   trunk/lib/SquidControl.pm
+   trunk/lib/Status.pm
+   trunk/sec.pl
+   trunk/templates/es/status.html
+Log:
+* The system generates the squid.conf file and copies it to /etc/squid/
+
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-26 21:25:44 UTC (rev 19)
++++ trunk/index.pl	2005-09-27 17:44:55 UTC (rev 20)
+@@ -55,10 +55,14 @@
+ 	# Choose the section and call the proper methods in the control objects.
+ 	if ( $sect eq 'status' ) {
+ 		#-- Status section --#
+-		my $s = $sc->param("status");
+-		print $cgi->redirect("sec.pl?act=status") unless $s;
+-		$c = $stat->load($c, $s) if $s;
+-		$sc->clear("status");		# clear the status param in the session.
++		if(!$act){
++			my $s = $sc->param("status");
++			print $cgi->redirect("sec.pl?act=status") unless $s;
++			$c = $stat->load($c, $s) if $s;
++			$sc->clear("status");		# clear the status param in the session.
++		} elsif( $act eq 'restart'){
++			print $cgi->redirect("sec.pl?act=restart");
++		}
+ 	} elsif ( $sect eq 'general' ) {
+ 		#-- General section --#
+ 		$c = $gen->load($c) unless $act;
+@@ -129,7 +133,8 @@
+ } 
+ 
+ # Write the configuration file locally.
+-$squc->writeFile();
++Logger->message("changed: ".$gen->isChanged());
++$squc->writeFile() if $gen->isChanged() == 1;
+ 
+ # Replace the content in the template and print it if exists, else log an error.
+ $t =~ s/<!-- CONTENT -->/$c/ if ($t && $c);
+
+Modified: trunk/lib/General.pm
+===================================================================
+--- trunk/lib/General.pm	2005-09-26 21:25:44 UTC (rev 19)
++++ trunk/lib/General.pm	2005-09-27 17:44:55 UTC (rev 20)
+@@ -45,8 +45,9 @@
+ 		$g->visible_hostname($ph->{gName});
+ 		$g->append_domain($ph->{gDomain});
+ 		$g->icp_port($ph->{gIPort});
+-		return $g->update;
+-	} else { return 0; }
++		return $g->update if General->isChanged(1);
++	}
++	return 0;
+ }
+ 
+ sub validate{
+@@ -88,13 +89,20 @@
+ 	my $ph = shift;
+ 	my $g = General->retrieve(1);
+ 	$g->cache_mem($ph->{cMem});
+-	return $g->update;
++	return $g->update if General->isChanged(1);
++	return 0;
+ }
+ 
+ sub isChanged{
+ 	shift;
++	my $var;
++	$var = shift if @_;		# method called with a param.		
+ 	my $g = General->retrieve(1);
+-	return $g->changed;
++	if (defined($var) && ($var == 1 || $var == 0)){
++		$g->changed($var);
++		$g->update;
++	} 
++	return $g->changed();
+ }
+ 
+ sub load{
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-09-26 21:25:44 UTC (rev 19)
++++ trunk/lib/SquidControl.pm	2005-09-27 17:44:55 UTC (rev 20)
+@@ -19,6 +19,7 @@
+ 	open(FILE,">etc/squid.conf") or die "Error: ".$!;
+ 	print FILE $cont;
+ 	close(FILE);
++	return General->isChanged(0);
+ }
+ 
+ sub header {
+
+Modified: trunk/lib/Status.pm
+===================================================================
+--- trunk/lib/Status.pm	2005-09-26 21:25:44 UTC (rev 19)
++++ trunk/lib/Status.pm	2005-09-27 17:44:55 UTC (rev 20)
+@@ -20,6 +20,10 @@
+ 
+ 	my $squ = $s->{squ} ? _("running") : _("stopped");
+ 	$c =~ s/<!-- SQ-STATUS -->/$squ/;
++	
++	my $res = 	"<a href=index.pl?sect=status&act=restart>".
++			_("Restart squid and aply the changes.")."</a>";
++	$c =~ s/<!-- RESTART -->/$res/ if ($s->{sys} || $s->{squ});
+ 
+ 	return $c;
+ }
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-09-26 21:25:44 UTC (rev 19)
++++ trunk/sec.pl	2005-09-27 17:44:55 UTC (rev 20)
+@@ -34,6 +34,11 @@
+ 
+ 		POSIX::setuid($uid); 		# Hold privileges.
+ 		$sc->param('status', $s);
++	} elsif($act && $act eq 'restart') {
++		&getRoot() or Logger->error("Can't get root privileges");
++		my $res = `cp etc/squid.conf /etc/squid; /etc/init.d/squid restart`;
++		Logger->message("Restart result: ".$res);
++		$sc->param('restart', $res);
+ 	}
+ } else {
+ 	# An error. This script should not be called without being logged in.
+
+Modified: trunk/templates/es/status.html
+===================================================================
+--- trunk/templates/es/status.html	2005-09-26 21:25:44 UTC (rev 19)
++++ trunk/templates/es/status.html	2005-09-27 17:44:55 UTC (rev 20)
+@@ -1,5 +1,6 @@
+ <h1>Inicio</h1>
+ 					<p>Bienvenido al Sistema de Navegaci?n Controlada.</p>
+ 					<p>El sistema est? <!-- SYS-STATUS -->.</p>
+-					<p><!-- CHANGES --></p>
+ 					<p>Squid est? <!-- SQ-STATUS -->.</p>
++					<p><!-- RESTART --></p>
++					<p><!-- RESULT --></p>
+
+
+
+From dasenjo at berlios.de  Fri Sep 30 01:22:31 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Fri, 30 Sep 2005 01:22:31 +0200
+Subject: [Tentaculo-svn] r21 - in trunk: . lib templates/es
+Message-ID: <200509292322.j8TNMVxw016095@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-30 01:22:27 +0200 (Fri, 30 Sep 2005)
+New Revision: 21
+
+Modified:
+   trunk/index.pl
+   trunk/lib/Cache_Dir.pm
+   trunk/lib/SquidControl.pm
+   trunk/lib/Status.pm
+   trunk/sec.pl
+   trunk/templates/es/status.html
+Log:
+* The squid interaction squid is usable. The system copies the conf file
+  and reload/start squid.
+
+
+Modified: trunk/index.pl
+===================================================================
+--- trunk/index.pl	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/index.pl	2005-09-29 23:22:27 UTC (rev 21)
+@@ -57,9 +57,10 @@
+ 		#-- Status section --#
+ 		if(!$act){
+ 			my $s = $sc->param("status");
++			my $r = $sc->param("restart");
+ 			print $cgi->redirect("sec.pl?act=status") unless $s;
+-			$c = $stat->load($c, $s) if $s;
+-			$sc->clear("status");		# clear the status param in the session.
++			$c = $stat->load($c, $s, $r) if $s;
++			$sc->clear(["status"]); # clear session params 
+ 		} elsif( $act eq 'restart'){
+ 			print $cgi->redirect("sec.pl?act=restart");
+ 		}
+@@ -133,7 +134,6 @@
+ } 
+ 
+ # Write the configuration file locally.
+-Logger->message("changed: ".$gen->isChanged());
+ $squc->writeFile() if $gen->isChanged() == 1;
+ 
+ # Replace the content in the template and print it if exists, else log an error.
+
+Modified: trunk/lib/Cache_Dir.pm
+===================================================================
+--- trunk/lib/Cache_Dir.pm	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/lib/Cache_Dir.pm	2005-09-29 23:22:27 UTC (rev 21)
+@@ -3,6 +3,7 @@
+ 
+ use strict;
+ use Logger;
++use General;
+ 
+ Cache_Dir->table('cache_dir');
+ Cache_Dir->columns(All => qw/id directory size/);
+@@ -29,7 +30,7 @@
+ 	my $cd = Cache_Dir->retrieve($ph->{cID});
+ 	$cd->directory($ph->{cDir}) if $cd;
+ 	$cd->size($ph->{cSize}) if $cd;
+-	return $cd->update if $cd;
++	return $cd->update if ($cd && General->isChanged(1));
+ 	return 0;
+ }
+ 
+
+Modified: trunk/lib/SquidControl.pm
+===================================================================
+--- trunk/lib/SquidControl.pm	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/lib/SquidControl.pm	2005-09-29 23:22:27 UTC (rev 21)
+@@ -15,7 +15,7 @@
+ 
+ sub writeFile{
+ 	shift;
+-	my $cont = &header().&general().&cache().&acl();
++	my $cont = &header().&general().&cache().&acl().&http_access();
+ 	open(FILE,">etc/squid.conf") or die "Error: ".$!;
+ 	print FILE $cont;
+ 	close(FILE);
+@@ -50,6 +50,7 @@
+ 	# hierarchy_stoplist and no_cache configurations are squid recommended
+ 	$ret .= &simpleTag('hierarchy_stoplist', 'cgi-bin ?');
+ 	$ret .=	"#  TAG: no_cache\n";
++	$ret .=	"#  (squid recommended)\n";
+ 	$ret .= "# -----------------------------------------------------------\n";
+ 	$ret .= 'acl QUERY urlpath_regex cgi-bin \?'."\n";
+ 	$ret .= "no_cache deny QUERY\n\n";
+@@ -90,6 +91,25 @@
+ 	$ret .= "acl CONNECT method CONNECT\n";
+ }
+ 
++sub http_access {
++	shift;
++	my $ret;
++	# Only allow cachemgr access from localhost
++	$ret .= "http_access allow manager localhost\n";
++	$ret .= "http_access deny manager\n";
++	# Only allow purge requests from localhost
++	$ret .= "http_access allow purge localhost\n";
++	$ret .= "http_access deny purge\n";
++	$ret .= "# Deny requests to unknown ports\n";
++	$ret .= "http_access deny !Safe_ports\n";
++	# Deny CONNECT to other than SSL ports
++	$ret .= "http_access deny CONNECT !SSL_ports\n";
++	# INSERT YOUR OWN RULE(S) HERE TO ALLOW ACCESS FROM YOUR CLIENTS
++	$ret .= "http_access allow localhost\n";
++	# And finally deny all other access to this proxy
++	$ret .= "http_access deny all\n";
++	return $ret;
++}
+ sub simpleTag {
+ 	my $ret;
+ 	my ($tag, $value) = @_;
+
+Modified: trunk/lib/Status.pm
+===================================================================
+--- trunk/lib/Status.pm	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/lib/Status.pm	2005-09-29 23:22:27 UTC (rev 21)
+@@ -13,7 +13,7 @@
+ 
+ sub load{
+ 	shift;
+-	my ($c, $s) = @_;
++	my ($c, $s, $r) = @_;
+ 
+ 	my $sys = $s->{sys} ? _("controlling squid") : _("not controlling squid");
+ 	$c =~ s/<!-- SYS-STATUS -->/$sys/;
+@@ -21,9 +21,7 @@
+ 	my $squ = $s->{squ} ? _("running") : _("stopped");
+ 	$c =~ s/<!-- SQ-STATUS -->/$squ/;
+ 	
+-	my $res = 	"<a href=index.pl?sect=status&act=restart>".
+-			_("Restart squid and aply the changes.")."</a>";
+-	$c =~ s/<!-- RESTART -->/$res/ if ($s->{sys} || $s->{squ});
++	$c =~ s/<!-- RESTART -->/$r/ if $r;
+ 
+ 	return $c;
+ }
+
+Modified: trunk/sec.pl
+===================================================================
+--- trunk/sec.pl	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/sec.pl	2005-09-29 23:22:27 UTC (rev 21)
+@@ -15,29 +15,32 @@
+ my $cgi = new CGI;
+ my $sc = SessionControl->new($cgi);
+ $sc->startSession();		# Start a new session or recover an started one.
++my $scf = "/etc/squid/squid.conf";
+ 
+ if ( $sc->isLoggedIn() ){
+ 	my $uid = POSIX::getuid();
+ 	my $act = $cgi->url_param('act');
++	my $stat = $sc->param('status');
+ 
+-	Logger->message("Called sec.pl");
+-
+ 	if($act && $act eq 'status'){
+-		my $s = { sys => 0, cha => 0, squ => 0};
++		my $s = { sys => 0, squ => 0};
+ 		&getRoot() or Logger->error("Can't get root privileges");
+-
+ 		# Compare the files to check if the system is controlling squid.
+-		$s->{sys} = 1 unless `diff etc/squid.conf /etc/squid/squid.conf`;
+-
++		$s->{sys} = 1 unless `diff etc/squid.conf $scf`;
+ 		# Is squid running?
+ 		$s->{squ} = 1 if `pgrep squid`;
+-
+-		POSIX::setuid($uid); 		# Hold privileges.
++		&holdRoot($uid) or die "Can't hold root privilegs";
+ 		$sc->param('status', $s);
+ 	} elsif($act && $act eq 'restart') {
+ 		&getRoot() or Logger->error("Can't get root privileges");
+-		my $res = `cp etc/squid.conf /etc/squid; /etc/init.d/squid restart`;
+-		Logger->message("Restart result: ".$res);
++		# Make a backup the first time.
++		`cp $scf $scf.tent` if (-e $scf && !-e $scf."tent");
++		# An easy way: copy the configuration file and reload/start squid.
++		my $res = `cp -v etc/squid.conf $scf;`;
++		if ($stat && $stat->{squ}){ $res .= `squid -k reconfigure`; } # running, just reload
++		else {  $res .= `/etc/init.d/squid start`; }
++		&holdRoot($uid) or die "Can't hold root privileges";
++		Logger->message("Restarting squid result: $res");
+ 		$sc->param('restart', $res);
+ 	}
+ } else {
+@@ -55,3 +58,10 @@
+ 	return 0;
+ }
+ 
++sub holdRoot{
++	shift;
++	my $uid = shift;
++	POSIX::setuid($uid);
++	return 1 if POSIX::getuid() == $uid;
++	return 0;
++}
+
+Modified: trunk/templates/es/status.html
+===================================================================
+--- trunk/templates/es/status.html	2005-09-27 17:44:55 UTC (rev 20)
++++ trunk/templates/es/status.html	2005-09-29 23:22:27 UTC (rev 21)
+@@ -2,5 +2,5 @@
+ 					<p>Bienvenido al Sistema de Navegaci?n Controlada.</p>
+ 					<p>El sistema est? <!-- SYS-STATUS -->.</p>
+ 					<p>Squid est? <!-- SQ-STATUS -->.</p>
++					<p><a href=index.pl?sect=status&act=restart>Restart squid and aply the changes</a></p>
+ 					<p><!-- RESTART --></p>
+-					<p><!-- RESULT --></p>
+
+
+
+From dasenjo at berlios.de  Sat Sep 24 23:57:05 2005
+From: dasenjo at berlios.de (Diego Andrés Asenjo González at BerliOS)
+Date: Sat, 24 Sep 2005 23:57:05 +0200
+Subject: [Tentaculo-svn] r17 - in trunk: doc lib misc
+Message-ID: <200509242157.j8OLv5Nh008356@sheep.berlios.de>
+
+Author: dasenjo
+Date: 2005-09-24 23:57:04 +0200 (Sat, 24 Sep 2005)
+New Revision: 17
+
+Added:
+   trunk/misc/tentaculo.sql
+Removed:
+   trunk/doc/MAP
+   trunk/doc/TODO
+   trunk/doc/UseCases
+   trunk/doc/db.xml
+   trunk/misc/nc.po
+   trunk/misc/nc.sql
+Modified:
+   trunk/doc/INSTALL
+   trunk/doc/README
+   trunk/doc/TAGS
+   trunk/lib/DBIBase.pm
+Log:
+* Removed useless/incomplete files.
+* Addede the database model with correct default values.
+* The installation proccess is a little easier.
+
+
+
+Modified: trunk/doc/INSTALL
+===================================================================
+--- trunk/doc/INSTALL	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/doc/INSTALL	2005-09-24 21:57:04 UTC (rev 17)
+@@ -2,17 +2,24 @@
+ 
+ * Uncompress the .tar.gz
+ 
+-* Move the navcon directory to the DocumentRoot in your apache web server
++* Move the 'tentaculo' directory to the DocumentRoot in your apache web server.
++  The files in the 'log' directory must be writable by the user running the 
++  webserver. Change the group that own the files by the webserver group and give 
++  write privileges to it (You need root privileges to execute these operations.):
++  
++  # chgrp www-data/*; chmod g+w log/*
+ 
++  www-data is the default webserver groupname in Debian, the groupname depends on
++  each distribution.
++
+ * Copy the contents of the misc/apache.conf in the apache configuration file. 
+   The file is based on Debian defaults. Change /var/www to your DocumentRoot.
+-  You can add an Include /path/to/navcon/misc/apache.conf line in the apache
+-  configuration file too
++  You can add an 'Include /path/to/tentaculo/misc/apache.conf' line in the apache
++  configuration file too.
+ 
+-* Create the directory /var/log/nc and the files messages and errors into it 
+-  with permissions 660 owned by root:'apache-group'. The debian default values
+-  are root:www-data
+-
+ * Import the default database from misc/tentaculo.sql into a mysql 4.0 server and 
+   create an account with all data privileges (Select, Insert, Update and Delete) 
+   in this database. Change the access data (username and password) in lib/DBIBase.pm
++
++* Point your browser to http://server/tentaculo . The default username and password
++  are 'admin' and 'hola' respectivly.
+
+Deleted: trunk/doc/MAP
+===================================================================
+--- trunk/doc/MAP	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/doc/MAP	2005-09-24 21:57:04 UTC (rev 17)
+@@ -1,9 +0,0 @@
+-Sections:
+-
+-* general
+-* cache
+-	' dir
+-* acl
+-* delay
+-* settings
+-	' password
+
+Modified: trunk/doc/README
+===================================================================
+--- trunk/doc/README	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/doc/README	2005-09-24 21:57:04 UTC (rev 17)
+@@ -4,6 +4,3 @@
+ + Perl 5.8
+ + CGI:Session, DBI and Class::DBI perl modules
+ + MySQL 4.0 
+-
+-
+-The database has been modeled with DBDesigner4 (http://www.fabforce.net/dbdesigner4/) and the model file is doc/db.xml
+
+Modified: trunk/doc/TAGS
+===================================================================
+--- trunk/doc/TAGS	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/doc/TAGS	2005-09-24 21:57:04 UTC (rev 17)
+@@ -1,4 +1,4 @@
+-This file document the tags suppported in the system.
++This file document the squid.conf tags suppported in the system.
+ 
+ * Tags suppported:
+ General: http_port, visible_hostname
+
+Deleted: trunk/doc/TODO
+===================================================================
+--- trunk/doc/TODO	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/doc/TODO	2005-09-24 21:57:04 UTC (rev 17)
+@@ -1,5 +0,0 @@
+-* javascript form validation
+-* i18n
+-* css
+-* squid
+-* templates in English
+
+Deleted: trunk/doc/UseCases
+===================================================================
+--- trunk/doc/UseCases	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/doc/UseCases	2005-09-24 21:57:04 UTC (rev 17)
+@@ -1,249 +0,0 @@
+-************************* Use Cases Model *************************
+-
+-*--------------------- Actors Identification ---------------------*
+-
+-- User: this actor is present only to log in the system.
+-- Administrator: is the only that use the system functionality.
+-
+-*----------------------- Use Cases Diagram -----------------------*
+-
+-The diagram is in the UseCase.png file.
+-
+-*--------------------- Use Cases Description ---------------------*
+-
+-###################################################################
+-# Name	      # Login                                             # 
+-# 	      #                                                   # 
+-# Actors      # User                                              # 
+-# 	      #                                                   # 
+-# Type	      # Primary                                           # 
+-# 	      #                                                   # 
+-# Abstract    # The user enter his username and password to log   # 
+-# 	      # into the system and use its functionality. It is  # 
+-# 	      # the only available use case for this user. The    # 
+-# 	      # rest of the functionality is only available to    #
+-# 	      # the system Administrator.                         # 
+-# 	      #                                                   # 
+-# Description # 1. The user access the init interface.            # 
+-# 	      # 2. The system asks for the username and password. # 
+-# 	      # 3. The user enters the information.               # 
+-# 	      # 4. The system validates the info. and shows the   # 
+-# 	      #    administration page.                           # 
+-# 	      #                                                   # 
+-# Notes	      # The default username is 'admin' and the default   #
+-# 	      # password is empty.                                # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      # Configure General Setting                         # 
+-# 	      #                                                   # 
+-# Actors      # Administrator                                     # 
+-# 	      #                                                   # 
+-# Type	      # Primary                                           # 
+-# 	      #                                                   # 
+-# Abstract    # The Admin. can set the basic general settings of  # 
+-# 	      # the system.                                       # 
+-# 	      #                                                   # 
+-# Description # 1. The user access the General Configuration      # 
+-# 	      #    interface.                                     # 
+-# 	      # 2. The system shows the basic setting and allow   # 
+-# 	      #    the user to change them.                       # 
+-# 	      # 3. The user changes the information.              # 
+-# 	      # 4. The system validates teh info. and configure   # 
+-# 	      #    the basic settings.                            # 
+-# 	      #                                                   # 
+-# Notes	      #                                                   # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      # Configure Peer                                    # 
+-# 	      #                                                   # 
+-# Actors      # Administrator                                     # 
+-# 	      #                                                   # 
+-# Type	      # Primary                                           # 
+-# 	      #                                                   # 
+-# Abstract    # The Administrator enters a host address and port  # 
+-# 	      # to configure it as a cache peer.                  # 
+-# 	      #                                                   # 
+-# Description # 1. The user access the Peer Configuration inter-  # 
+-# 	      #    face.                                          # 
+-# 	      # 2. The system asks for the address and the ports  # 
+-# 	      # 3. The user enters the information.               # 
+-# 	      # 4. The system validates teh info. and configure   # 
+-# 	      #    the host as a cache peer.                      # 
+-# 	      #                                                   # 
+-# Notes	      #                                                   # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      # Change Password                                   # 
+-# 	      #                                                   # 
+-# Actors      # Administrator                                     # 
+-# 	      #                                                   # 
+-# Type	      # Primary                                           # 
+-# 	      #                                                   # 
+-# Abstract    # The Administrator can change his/her password.    # 
+-# 	      #                                                   # 
+-# Description # 1. The user access the Change Password interface. # 
+-# 	      # 2. The system asks for the old and the new        # 
+-# 	      #    passwords.                                     # 
+-# 	      # 3. The system validates the info. and change the  # 
+-# 	      #    Administrator password.                        # 
+-# 	      #                                                   # 
+-# Notes	      # 4. The new password must be typed twice.          # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      #                                                   # 
+-# 	      #                                                   # 
+-# Actors      #                                                   # 
+-# 	      #                                                   # 
+-# Type	      #                                                   # 
+-# 	      #                                                   # 
+-# Abstract    #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Description #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Notes	      #                                                   # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      #                                                   # 
+-# 	      #                                                   # 
+-# Actors      #                                                   # 
+-# 	      #                                                   # 
+-# Type	      #                                                   # 
+-# 	      #                                                   # 
+-# Abstract    #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Description #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Notes	      #                                                   # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      #                                                   # 
+-# 	      #                                                   # 
+-# Actors      #                                                   # 
+-# 	      #                                                   # 
+-# Type	      #                                                   # 
+-# 	      #                                                   # 
+-# Abstract    #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Description #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Notes	      #                                                   # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      #                                                   # 
+-# 	      #                                                   # 
+-# Actors      #                                                   # 
+-# 	      #                                                   # 
+-# Type	      #                                                   # 
+-# 	      #                                                   # 
+-# Abstract    #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Description #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Notes	      #                                                   # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      #                                                   # 
+-# 	      #                                                   # 
+-# Actors      #                                                   # 
+-# 	      #                                                   # 
+-# Type	      #                                                   # 
+-# 	      #                                                   # 
+-# Abstract    #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Description #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Notes	      #                                                   # 
+-# 	      #                                                   # 
+-###################################################################
+-
+-###################################################################
+-# Name	      #                                                   # 
+-# 	      #                                                   # 
+-# Actors      #                                                   # 
+-# 	      #                                                   # 
+-# Type	      #                                                   # 
+-# 	      #                                                   # 
+-# Abstract    #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Description #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# 	      #                                                   # 
+-# Notes	      #                                                   # 
+-# 	      #                                                   # 
+-###################################################################
+-
+
+Deleted: trunk/doc/db.xml
+===================================================================
+--- trunk/doc/db.xml	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/doc/db.xml	2005-09-24 21:57:04 UTC (rev 17)
+@@ -1,548 +0,0 @@
+-<?xml version="1.0" standalone="yes" ?>
+-<DBMODEL Version="4.0">
+-<SETTINGS>
+-<GLOBALSETTINGS ModelName="nc" IDModel="0" IDVersion="0" VersionStr="1.0.0.0" Comments="" UseVersionHistroy="1" AutoIncVersion="1" DatabaseType="MySQL" ZoomFac="100.00" XPos="0" YPos="0" DefaultDataType="5" DefaultTablePrefix="0" DefSaveDBConn="" DefSyncDBConn="tentaculo" DefQueryDBConn="" Printer="" HPageCount="4.0" PageAspectRatio="1.440892512336408" PageOrientation="1" PageFormat="A4 (210x297 mm, 8.26x11.7 inches)" SelectedPages="" UsePositionGrid="0" PositionGridX="20" PositionGridY="20" TableNameInRefs="0" DefaultTableType="0" ActivateRefDefForNewRelations="1" FKPrefix="" FKPostfix="" CreateFKRefDefIndex="0" DBQuoteCharacter="`" CreateSQLforLinkedObjects="0" DefModelFont="Nimbus Sans L" CanvasWidth="4096" CanvasHeight="2842" />
+-<DATATYPEGROUPS>
+-<DATATYPEGROUP Name="Numeric Types" Icon="1" />
+-<DATATYPEGROUP Name="Date and Time Types" Icon="2" />
+-<DATATYPEGROUP Name="String Types" Icon="3" />
+-<DATATYPEGROUP Name="Blob and Text Types" Icon="4" />
+-<DATATYPEGROUP Name="User defined Types" Icon="5" />
+-<DATATYPEGROUP Name="Geographic Types" Icon="6" />
+-</DATATYPEGROUPS>
+-<DATATYPES>
+-<DATATYPE ID="1" IDGroup="0" TypeName="TINYINT" Description="A very small integer. The signed range is -128 to 127. The unsigned range is 0 to 255." ParamCount="1" OptionCount="2" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="UNSIGNED" Default="1" />
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="2" IDGroup="0" TypeName="SMALLINT" Description="A small integer. The signed range is -32768 to 32767. The unsigned range is 0 to 65535." ParamCount="1" OptionCount="2" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="UNSIGNED" Default="1" />
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="3" IDGroup="0" TypeName="MEDIUMINT" Description="A medium-size integer. The signed range is -8388608 to 8388607. The unsigned range is 0 to 16777215." ParamCount="1" OptionCount="2" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="UNSIGNED" Default="1" />
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="4" IDGroup="0" TypeName="INT" Description="A normal-size integer. The signed range is -2147483648 to 2147483647. The unsigned range is 0 to 4294967295." ParamCount="1" OptionCount="2" ParamRequired="0" EditParamsAsString="0" SynonymGroup="1" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="UNSIGNED" Default="0" />
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="5" IDGroup="0" TypeName="INTEGER" Description="A normal-size integer. The signed range is -2147483648 to 2147483647. The unsigned range is 0 to 4294967295." ParamCount="1" OptionCount="2" ParamRequired="0" EditParamsAsString="0" SynonymGroup="1" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="UNSIGNED" Default="1" />
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="6" IDGroup="0" TypeName="BIGINT" Description="A large integer. The signed range is -9223372036854775808 to 9223372036854775807. The unsigned range is 0 to 18446744073709551615." ParamCount="1" OptionCount="2" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="UNSIGNED" Default="0" />
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="7" IDGroup="0" TypeName="FLOAT" Description="A small (single-precision) floating-point number. Cannot be unsigned. Allowable values are -3.402823466E+38 to -1.175494351E-38, 0, and 1.175494351E-38 to 3.402823466E+38." ParamCount="1" OptionCount="1" ParamRequired="1" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="precision" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="8" IDGroup="0" TypeName="FLOAT" Description="A small (single-precision) floating-point number. Cannot be unsigned. Allowable values are -3.402823466E+38 to -1.175494351E-38, 0, and 1.175494351E-38 to 3.402823466E+38." ParamCount="2" OptionCount="1" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-<PARAM Name="decimals" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="9" IDGroup="0" TypeName="DOUBLE" Description="A normal-size (double-precision) floating-point number. Cannot be unsigned. Allowable values are -1.7976931348623157E+308 to -2.2250738585072014E-308, 0, and 2.2250738585072014E-308 to 1.7976931348623157E+308." ParamCount="2" OptionCount="1" ParamRequired="0" EditParamsAsString="0" SynonymGroup="2" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-<PARAM Name="decimals" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="10" IDGroup="0" TypeName="DOUBLE PRECISION" Description="This is a synonym for DOUBLE." ParamCount="2" OptionCount="1" ParamRequired="0" EditParamsAsString="0" SynonymGroup="2" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-<PARAM Name="decimals" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="11" IDGroup="0" TypeName="REAL" Description="This is a synonym for DOUBLE." ParamCount="2" OptionCount="1" ParamRequired="0" EditParamsAsString="0" SynonymGroup="2" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-<PARAM Name="decimals" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="12" IDGroup="0" TypeName="DECIMAL" Description="An unpacked floating-point number. Cannot be unsigned. Behaves like a CHAR column." ParamCount="2" OptionCount="1" ParamRequired="0" EditParamsAsString="0" SynonymGroup="3" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-<PARAM Name="decimals" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="13" IDGroup="0" TypeName="NUMERIC" Description="This is a synonym for DECIMAL." ParamCount="2" OptionCount="1" ParamRequired="1" EditParamsAsString="0" SynonymGroup="3" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-<PARAM Name="decimals" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="ZEROFILL" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="14" IDGroup="1" TypeName="DATE" Description="A date. The supported range is \a1000-01-01\a to \a9999-12-31\a." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="15" IDGroup="1" TypeName="DATETIME" Description="A date and time combination. The supported range is \a1000-01-01 00:00:00\a to \a9999-12-31 23:59:59\a." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="16" IDGroup="1" TypeName="TIMESTAMP" Description="A timestamp. The range is \a1970-01-01 00:00:00\a to sometime in the year 2037. The length can be 14 (or missing), 12, 10, 8, 6, 4, or 2 representing YYYYMMDDHHMMSS, ... , YYYYMMDD, ... , YY formats." ParamCount="1" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-</DATATYPE>
+-<DATATYPE ID="17" IDGroup="1" TypeName="TIME" Description="A time. The range is \a-838:59:59\a to \a838:59:59\a." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="18" IDGroup="1" TypeName="YEAR" Description="A year in 2- or 4-digit format (default is 4-digit)." ParamCount="1" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-</DATATYPE>
+-<DATATYPE ID="19" IDGroup="2" TypeName="CHAR" Description="A fixed-length string (1 to 255 characters) that is always right-padded with spaces to the specified length when stored. values are sorted and compared in case-insensitive fashion according to the default character set unless the BINARY keyword is given." ParamCount="1" OptionCount="1" ParamRequired="1" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="BINARY" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="20" IDGroup="2" TypeName="VARCHAR" Description="A variable-length string (1 to 255 characters). Values are sorted and compared in case-sensitive fashion unless the BINARY keyword is given." ParamCount="1" OptionCount="1" ParamRequired="1" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="length" />
+-</PARAMS>
+-<OPTIONS>
+-<OPTION Name="BINARY" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="21" IDGroup="2" TypeName="BIT" Description="This is a synonym for CHAR(1)." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="22" IDGroup="2" TypeName="BOOL" Description="This is a synonym for CHAR(1)." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="23" IDGroup="3" TypeName="TINYBLOB" Description="A column maximum length of 255 (2^8 - 1) characters. Values are sorted and compared in case-sensitive fashion." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="24" IDGroup="3" TypeName="BLOB" Description="A column maximum length of 65535 (2^16 - 1) characters. Values are sorted and compared in case-sensitive fashion." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="25" IDGroup="3" TypeName="MEDIUMBLOB" Description="A column maximum length of 16777215 (2^24 - 1) characters. Values are sorted and compared in case-sensitive fashion." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="26" IDGroup="3" TypeName="LONGBLOB" Description="A column maximum length of 4294967295 (2^32 - 1) characters. Values are sorted and compared in case-sensitive fashion." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="27" IDGroup="3" TypeName="TINYTEXT" Description="A column maximum length of 255 (2^8 - 1) characters." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="28" IDGroup="3" TypeName="TEXT" Description="A column maximum length of 65535 (2^16 - 1) characters." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="29" IDGroup="3" TypeName="MEDIUMTEXT" Description="A column maximum length of 16777215 (2^24 - 1) characters." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="30" IDGroup="3" TypeName="LONGTEXT" Description="A column maximum length of 4294967295 (2^32 - 1) characters." ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="31" IDGroup="3" TypeName="ENUM" Description="An enumeration. A string object that can have only one value, chosen from the list of values." ParamCount="1" OptionCount="0" ParamRequired="1" EditParamsAsString="1" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="values" />
+-</PARAMS>
+-</DATATYPE>
+-<DATATYPE ID="32" IDGroup="3" TypeName="SET" Description="A set. A string object that can have zero or more values, each of which must be chosen from the list of values." ParamCount="1" OptionCount="0" ParamRequired="1" EditParamsAsString="1" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<PARAMS>
+-<PARAM Name="values" />
+-</PARAMS>
+-</DATATYPE>
+-<DATATYPE ID="33" IDGroup="4" TypeName="Varchar(20)" Description="" ParamCount="0" OptionCount="1" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<OPTIONS>
+-<OPTION Name="BINARY" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="34" IDGroup="4" TypeName="Varchar(45)" Description="" ParamCount="0" OptionCount="1" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<OPTIONS>
+-<OPTION Name="BINARY" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="35" IDGroup="4" TypeName="Varchar(255)" Description="" ParamCount="0" OptionCount="1" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-<OPTIONS>
+-<OPTION Name="BINARY" Default="0" />
+-</OPTIONS>
+-</DATATYPE>
+-<DATATYPE ID="36" IDGroup="5" TypeName="GEOMETRY" Description="Geographic Datatype" ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="38" IDGroup="5" TypeName="LINESTRING" Description="Geographic Datatype" ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="39" IDGroup="5" TypeName="POLYGON" Description="Geographic Datatype" ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="40" IDGroup="5" TypeName="MULTIPOINT" Description="Geographic Datatype" ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="41" IDGroup="5" TypeName="MULTILINESTRING" Description="Geographic Datatype" ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="42" IDGroup="5" TypeName="MULTIPOLYGON" Description="Geographic Datatype" ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-<DATATYPE ID="43" IDGroup="5" TypeName="GEOMETRYCOLLECTION" Description="Geographic Datatype" ParamCount="0" OptionCount="0" ParamRequired="0" EditParamsAsString="0" SynonymGroup="0" PhysicalMapping="0" PhysicalTypeName="" >
+-</DATATYPE>
+-</DATATYPES>
+-<COMMON_DATATYPES>
+-<COMMON_DATATYPE ID="5" />
+-<COMMON_DATATYPE ID="8" />
+-<COMMON_DATATYPE ID="20" />
+-<COMMON_DATATYPE ID="15" />
+-<COMMON_DATATYPE ID="22" />
+-<COMMON_DATATYPE ID="28" />
+-<COMMON_DATATYPE ID="26" />
+-<COMMON_DATATYPE ID="33" />
+-<COMMON_DATATYPE ID="34" />
+-<COMMON_DATATYPE ID="35" />
+-</COMMON_DATATYPES>
+-<TABLEPREFIXES>
+-<TABLEPREFIX Name="Default (no prefix)" />
+-</TABLEPREFIXES>
+-<REGIONCOLORS>
+-<REGIONCOLOR Color="Red=#FFEEEC" />
+-<REGIONCOLOR Color="Yellow=#FEFDED" />
+-<REGIONCOLOR Color="Green=#EAFFE5" />
+-<REGIONCOLOR Color="Cyan=#ECFDFF" />
+-<REGIONCOLOR Color="Blue=#F0F1FE" />
+-<REGIONCOLOR Color="Magenta=#FFEBFA" />
+-</REGIONCOLORS>
+-<POSITIONMARKERS>
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-<POSITIONMARKER ZoomFac="-1.0" X="0" Y="0" />
+-</POSITIONMARKERS>
+-</SETTINGS>
+-<METADATA>
+-<REGIONS>
+-</REGIONS>
+-<TABLES>
+-<TABLE ID="1001" Tablename="admin" PrevTableName="" XPos="80" YPos="40" TableType="0" TablePrefix="0" nmTable="0" Temporary="0" UseStandardInserts="0" StandardInserts="\n" TableOptions="DelayKeyTblUpdates=0\nPackKeys=0\nRowChecksum=0\nRowFormat=0\nUseRaid=0\nRaidType=0\n" Comments="" Collapsed="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="2" >
+-<COLUMNS>
+-<COLUMN ID="1004" ColName="id" PrevColName="" Pos="1" idDatatype="5" DatatypeParams="" Width="0" Prec="0" PrimaryKey="1" NotNull="1" AutoInc="1" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1005" ColName="user_name" PrevColName="" Pos="2" idDatatype="20" DatatypeParams="(20)" Width="0" Prec="0" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1006" ColName="pass_word" PrevColName="" Pos="3" idDatatype="20" DatatypeParams="(50)" Width="0" Prec="0" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-</COLUMNS>
+-<INDICES>
+-<INDEX ID="1007" IndexName="PRIMARY" IndexKind="0" FKRefDef_Obj_id="-1">
+-<INDEXCOLUMNS>
+-<INDEXCOLUMN idColumn="1004" LengthParam="0" />
+-</INDEXCOLUMNS>
+-</INDEX>
+-</INDICES>
+-</TABLE>
+-<TABLE ID="1003" Tablename="general" PrevTableName="" XPos="307" YPos="185" TableType="0" TablePrefix="0" nmTable="0" Temporary="0" UseStandardInserts="0" StandardInserts="\n" TableOptions="DelayKeyTblUpdates=0\nPackKeys=0\nRowChecksum=0\nRowFormat=0\nUseRaid=0\nRaidType=0\n" Comments="" Collapsed="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="4" >
+-<COLUMNS>
+-<COLUMN ID="1012" ColName="id" PrevColName="" Pos="1" idDatatype="5" DatatypeParams="" Width="0" Prec="0" PrimaryKey="1" NotNull="1" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1013" ColName="enable" PrevColName="" Pos="2" idDatatype="22" DatatypeParams="" Width="0" Prec="0" PrimaryKey="0" NotNull="1" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1119" ColName="changed" PrevColName="" Pos="6" idDatatype="22" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="1" AutoInc="0" IsForeignKey="0" DefaultValue="0" Comments="">
+-<OPTIONSELECTED>
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1014" ColName="http_port" PrevColName="" Pos="3" idDatatype="2" DatatypeParams="" Width="0" Prec="0" PrimaryKey="0" NotNull="1" AutoInc="0" IsForeignKey="0" DefaultValue="3128" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1026" ColName="icp_port" PrevColName="" Pos="4" idDatatype="2" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="1" AutoInc="0" IsForeignKey="0" DefaultValue="3130" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1023" ColName="visible_hostname" PrevColName="" Pos="3" idDatatype="20" DatatypeParams="(255)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1123" ColName="append_domain" PrevColName="" Pos="7" idDatatype="20" DatatypeParams="(255)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1030" ColName="cache_mem" PrevColName="" Pos="5" idDatatype="20" DatatypeParams="(20)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="1" AutoInc="0" IsForeignKey="0" DefaultValue="8M" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-</COLUMNS>
+-<INDICES>
+-<INDEX ID="1018" IndexName="PRIMARY" IndexKind="0" FKRefDef_Obj_id="-1">
+-<INDEXCOLUMNS>
+-<INDEXCOLUMN idColumn="1012" LengthParam="0" />
+-</INDEXCOLUMNS>
+-</INDEX>
+-</INDICES>
+-</TABLE>
+-<TABLE ID="1031" Tablename="cache_dir" PrevTableName="Table_06" XPos="48" YPos="158" TableType="0" TablePrefix="0" nmTable="0" Temporary="0" UseStandardInserts="0" StandardInserts="\n" TableOptions="DelayKeyTblUpdates=0\nPackKeys=0\nRowChecksum=0\nRowFormat=0\nUseRaid=0\nRaidType=0\n" Comments="" Collapsed="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="4" >
+-<COLUMNS>
+-<COLUMN ID="1040" ColName="id" PrevColName="" Pos="0" idDatatype="5" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="1" NotNull="1" AutoInc="1" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1042" ColName="directory" PrevColName="" Pos="1" idDatatype="20" DatatypeParams="(255)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1043" ColName="size" PrevColName="" Pos="2" idDatatype="3" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-</COLUMNS>
+-<INDICES>
+-<INDEX ID="1041" IndexName="PRIMARY" IndexKind="0" FKRefDef_Obj_id="-1">
+-<INDEXCOLUMNS>
+-<INDEXCOLUMN idColumn="1040" LengthParam="0" />
+-</INDEXCOLUMNS>
+-</INDEX>
+-</INDICES>
+-</TABLE>
+-<TABLE ID="1044" Tablename="cache_peer" PrevTableName="Table_07" XPos="435" YPos="41" TableType="0" TablePrefix="0" nmTable="0" Temporary="0" UseStandardInserts="0" StandardInserts="\n" TableOptions="DelayKeyTblUpdates=0\nPackKeys=0\nRowChecksum=0\nRowFormat=0\nUseRaid=0\nRaidType=0\n" Comments="" Collapsed="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="5" >
+-<COLUMNS>
+-<COLUMN ID="1046" ColName="id" PrevColName="" Pos="0" idDatatype="5" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="1" NotNull="1" AutoInc="1" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1048" ColName="address" PrevColName="" Pos="1" idDatatype="20" DatatypeParams="(255)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1049" ColName="http_port" PrevColName="" Pos="2" idDatatype="2" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="1" AutoInc="0" IsForeignKey="0" DefaultValue="3128" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1050" ColName="icp_port" PrevColName="" Pos="3" idDatatype="2" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="1" AutoInc="0" IsForeignKey="0" DefaultValue="3130" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-</COLUMNS>
+-<INDICES>
+-<INDEX ID="1047" IndexName="PRIMARY" IndexKind="0" FKRefDef_Obj_id="-1">
+-<INDEXCOLUMNS>
+-<INDEXCOLUMN idColumn="1046" LengthParam="0" />
+-</INDEXCOLUMNS>
+-</INDEX>
+-</INDICES>
+-</TABLE>
+-<TABLE ID="1058" Tablename="acl" PrevTableName="Table_08" XPos="322" YPos="399" TableType="0" TablePrefix="0" nmTable="0" Temporary="0" UseStandardInserts="0" StandardInserts="\n" TableOptions="DelayKeyTblUpdates=0\nPackKeys=0\nRowChecksum=0\nRowFormat=0\nUseRaid=0\nRaidType=0\n" Comments="" Collapsed="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="6" >
+-<COLUMNS>
+-<COLUMN ID="1060" ColName="id" PrevColName="" Pos="0" idDatatype="5" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="1" NotNull="1" AutoInc="1" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1062" ColName="name" PrevColName="" Pos="1" idDatatype="20" DatatypeParams="(20)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1063" ColName="acltype" PrevColName="" Pos="2" idDatatype="19" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1064" ColName="aclstring" PrevColName="" Pos="3" idDatatype="20" DatatypeParams="(255)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-</COLUMNS>
+-<INDICES>
+-<INDEX ID="1061" IndexName="PRIMARY" IndexKind="0" FKRefDef_Obj_id="-1">
+-<INDEXCOLUMNS>
+-<INDEXCOLUMN idColumn="1060" LengthParam="0" />
+-</INDEXCOLUMNS>
+-</INDEX>
+-</INDICES>
+-</TABLE>
+-<TABLE ID="1068" Tablename="access" PrevTableName="Table_09" XPos="574" YPos="329" TableType="0" TablePrefix="0" nmTable="0" Temporary="0" UseStandardInserts="0" StandardInserts="\n" TableOptions="DelayKeyTblUpdates=0\nPackKeys=0\nRowChecksum=0\nRowFormat=0\nUseRaid=0\nRaidType=0\n" Comments="" Collapsed="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="7" >
+-<COLUMNS>
+-<COLUMN ID="1070" ColName="id" PrevColName="" Pos="0" idDatatype="5" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="1" NotNull="1" AutoInc="1" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1073" ColName="atype" PrevColName="" Pos="2" idDatatype="19" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1075" ColName="ad" PrevColName="" Pos="4" idDatatype="19" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1074" ColName="aclname" PrevColName="" Pos="3" idDatatype="5" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-</COLUMNS>
+-<INDICES>
+-<INDEX ID="1071" IndexName="PRIMARY" IndexKind="0" FKRefDef_Obj_id="-1">
+-<INDEXCOLUMNS>
+-<INDEXCOLUMN idColumn="1070" LengthParam="0" />
+-</INDEXCOLUMNS>
+-</INDEX>
+-</INDICES>
+-</TABLE>
+-<TABLE ID="1076" Tablename="delay_pool" PrevTableName="Table_10" XPos="31" YPos="323" TableType="0" TablePrefix="0" nmTable="0" Temporary="0" UseStandardInserts="0" StandardInserts="\n" TableOptions="DelayKeyTblUpdates=0\nPackKeys=0\nRowChecksum=0\nRowFormat=0\nUseRaid=0\nRaidType=0\n" Comments="" Collapsed="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="8" >
+-<COLUMNS>
+-<COLUMN ID="1078" ColName="id" PrevColName="" Pos="0" idDatatype="5" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="1" NotNull="1" AutoInc="1" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1080" ColName="class" PrevColName="" Pos="1" idDatatype="1" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1081" ColName="parameters" PrevColName="" Pos="2" idDatatype="20" DatatypeParams="(255)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-</COLUMNS>
+-<RELATIONS_START>
+-<RELATION_START ID="1117" />
+-</RELATIONS_START>
+-<INDICES>
+-<INDEX ID="1079" IndexName="PRIMARY" IndexKind="0" FKRefDef_Obj_id="-1">
+-<INDEXCOLUMNS>
+-<INDEXCOLUMN idColumn="1078" LengthParam="0" />
+-</INDEXCOLUMNS>
+-</INDEX>
+-</INDICES>
+-</TABLE>
+-<TABLE ID="1082" Tablename="delay_access" PrevTableName="Table_11" XPos="28" YPos="506" TableType="0" TablePrefix="0" nmTable="0" Temporary="0" UseStandardInserts="0" StandardInserts="\n" TableOptions="DelayKeyTblUpdates=0\nPackKeys=0\nRowChecksum=0\nRowFormat=0\nUseRaid=0\nRaidType=0\n" Comments="" Collapsed="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="9" >
+-<COLUMNS>
+-<COLUMN ID="1086" ColName="ord" PrevColName="" Pos="1" idDatatype="1" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1087" ColName="ad" PrevColName="" Pos="2" idDatatype="19" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1088" ColName="aclname" PrevColName="" Pos="3" idDatatype="20" DatatypeParams="(20)" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="0" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-<COLUMN ID="1116" ColName="delay_pool_id" PrevColName="" Pos="4" idDatatype="5" DatatypeParams="" Width="-1" Prec="-1" PrimaryKey="0" NotNull="0" AutoInc="0" IsForeignKey="1" DefaultValue="" Comments="">
+-<OPTIONSELECTED>
+-<OPTIONSELECT Value="1" />
+-<OPTIONSELECT Value="0" />
+-</OPTIONSELECTED>
+-</COLUMN>
+-</COLUMNS>
+-<RELATIONS_END>
+-<RELATION_END ID="1117" />
+-</RELATIONS_END>
+-</TABLE>
+-</TABLES>
+-<RELATIONS>
+-<RELATION ID="1117" RelationName="Rel_02" Kind="2" SrcTable="1076" DestTable="1082" FKFields="id=delay_pool_id\n" FKFieldsComments="\n" relDirection="3" MidOffset="0" OptionalStart="0" OptionalEnd="0" CaptionOffsetX="0" CaptionOffsetY="0" StartIntervalOffsetX="0" StartIntervalOffsetY="0" EndIntervalOffsetX="0" EndIntervalOffsetY="0" CreateRefDef="0" Invisible="0" RefDef="Matching=0\nOnDelete=3\nOnUpdate=3\n" Comments="" FKRefDefIndex_Obj_id="-1" Splitted="0" IsLinkedObject="0" IDLinkedModel="-1" Obj_id_Linked="-1" OrderPos="10" />
+-</RELATIONS>
+-<NOTES>
+-</NOTES>
+-<IMAGES>
+-</IMAGES>
+-</METADATA>
+-<PLUGINDATA>
+-<PLUGINDATARECORDS>
+-</PLUGINDATARECORDS>
+-</PLUGINDATA>
+-<QUERYDATA>
+-<QUERYRECORDS>
+-</QUERYRECORDS>
+-</QUERYDATA>
+-<LINKEDMODELS>
+-</LINKEDMODELS>
+-</DBMODEL>
+
+Modified: trunk/lib/DBIBase.pm
+===================================================================
+--- trunk/lib/DBIBase.pm	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/lib/DBIBase.pm	2005-09-24 21:57:04 UTC (rev 17)
+@@ -3,6 +3,6 @@
+ 
+ use strict;
+ 
+-DBIBase->connection('dbi:mysql:nc;host=localhost','tentaculo','squid');
++DBIBase->connection('dbi:mysql:tentaculo;host=localhost','tentaculo','squid');
+ 
+ 1;
+
+Deleted: trunk/misc/nc.po
+===================================================================
+--- trunk/misc/nc.po	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/misc/nc.po	2005-09-24 21:57:04 UTC (rev 17)
+@@ -1,41 +0,0 @@
+-# SOME DESCRIPTIVE TITLE.
+-# Copyright (C) YEAR Diego Andr?s Asenjo G. <dasenjo at unicauca.edu.co>
+-# This file is distributed under the same license as the PACKAGE package.
+-# FIRST AUTHOR <EMAIL at ADDRESS>, YEAR.
+-#
+-#, fuzzy
+-msgid ""
+-msgstr ""
+-"Project-Id-Version: PACKAGE VERSION\n"
+-"Report-Msgid-Bugs-To: dasenjo at unicauca.edu.co\n"
+-"POT-Creation-Date: 2005-08-25 17:52-0500\n"
+-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+-"Last-Translator: FULL NAME <EMAIL at ADDRESS>\n"
+-"Language-Team: LANGUAGE <LL at li.org>\n"
+-"MIME-Version: 1.0\n"
+-"Content-Type: text/plain; charset=ISO-8859-1\n"
+-"Content-Transfer-Encoding: 8bit\n"
+-
+-#: ../lib/Template.pm:24
+-msgid "Successful change"
+-msgstr "Cambio exitoso"
+-
+-#: ../lib/Template.pm:26
+-msgid "The general configuration has been changed successfully"
+-msgstr "Se ha cambiado la Configuraci?n General del sistema"
+-
+-#: ../lib/Template.pm:28
+-msgid "The cache configuration has been changed successfully"
+-msgstr ""
+-
+-#: ../lib/Template.pm:31
+-msgid "Unsuccessful change"
+-msgstr ""
+-
+-#: ../lib/Template.pm:32
+-msgid "There was a problem trying to change the information. Please try again."
+-msgstr ""
+-
+-#: ../lib/Template.pm:83
+-msgid "Username and/or password incorrect"
+-msgstr ""
+
+Deleted: trunk/misc/nc.sql
+===================================================================
+--- trunk/misc/nc.sql	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/misc/nc.sql	2005-09-24 21:57:04 UTC (rev 17)
+@@ -1,55 +0,0 @@
+--- Database : `nc`
+-CREATE DATABASE `nc`;
+-USE nc;
+-
+--- 
+--- `admin` table structure
+--- 
+-
+-CREATE TABLE `admin` (
+-  `id` int(11) NOT NULL auto_increment,
+-  `user_name` varchar(20) default NULL,
+-  `pass_word` varchar(50) default NULL,
+-  PRIMARY KEY  (`id`)
+-) TYPE=MyISAM AUTO_INCREMENT=2 ;
+-
+--- 
+--- `admin` table data
+--- 
+-
+-INSERT INTO `admin` VALUES (1, 'admin', 'd41d8cd98f00b204e9800998ecf8427e');
+-
+--- 
+--- `file` table structure
+--- 
+-
+-CREATE TABLE `file` (
+-  `id` int(11) NOT NULL auto_increment,
+-  `extension` varchar(50) NOT NULL default '',
+-  `bandwith` int(11) NOT NULL default '0',
+-  PRIMARY KEY  (`id`)
+-) TYPE=MyISAM AUTO_INCREMENT=1 ;
+-
+--- 
+--- `file` table data
+--- 
+-
+--- 
+--- `state` table structure
+--- 
+-
+-CREATE TABLE `state` (
+-  `id` int(11) NOT NULL auto_increment,
+-  `enable` tinyint(4) NOT NULL default '0',
+-  `port` int(11) NOT NULL default '3128',
+-  `act_time` varchar(30) NOT NULL default '',
+-  `dom_enable` tinyint(4) NOT NULL default '0',
+-  `refresh_list` tinyint(4) NOT NULL default '0',
+-  PRIMARY KEY  (`id`)
+-) TYPE=MyISAM AUTO_INCREMENT=2 ;
+-
+---
+---`state` table data 
+--- 
+-
+-INSERT INTO `state` VALUES (1, 1, 3128, '', 0, 0);
+
+Added: trunk/misc/tentaculo.sql
+===================================================================
+--- trunk/misc/tentaculo.sql	2005-09-22 09:28:01 UTC (rev 16)
++++ trunk/misc/tentaculo.sql	2005-09-24 21:57:04 UTC (rev 17)
+@@ -0,0 +1,149 @@
++-- Database: `tentaculo`
++-- --------------------------------------------------------
++
++-- 
++-- Structure for table `access`
++-- 
++
++CREATE TABLE access (
++  id int(10) unsigned NOT NULL auto_increment,
++  atype char(1) default NULL,
++  ad char(1) default NULL,
++  aclname int(10) unsigned default NULL,
++  PRIMARY KEY  (id)
++) AUTO_INCREMENT=1 ;
++
++-- --------------------------------------------------------
++
++-- 
++-- Structure for table `acl`
++-- 
++
++CREATE TABLE acl (
++  id int(10) unsigned NOT NULL auto_increment,
++  name varchar(20) default NULL,
++  acltype char(1) default NULL,
++  aclstring varchar(255) default NULL,
++  PRIMARY KEY  (id)
++) AUTO_INCREMENT=1 ;
++
++-- 
++-- Volcar la base de datos para la tabla `acl`
++-- 
++
++
++-- --------------------------------------------------------
++
++-- 
++-- Structure for table `admin`
++-- 
++
++CREATE TABLE admin (
++  id int(11) NOT NULL auto_increment,
++  user_name varchar(20) default NULL,
++  pass_word varchar(50) default NULL,
++  PRIMARY KEY  (id)
++) AUTO_INCREMENT=2 ;
++
++-- 
++-- Volcar la base de datos para la tabla `admin`
++-- 
++
++INSERT INTO admin VALUES (1, 'admin', '4d186321c1a7f0f354b297e8914ab240');
++
++-- --------------------------------------------------------
++
++-- 
++-- Structure for table `cache_dir`
++-- 
++
++CREATE TABLE cache_dir (
++  id int(10) unsigned NOT NULL auto_increment,
++  directory varchar(255) default NULL,
++  size mediumint(8) unsigned default NULL,
++  PRIMARY KEY  (id)
++) AUTO_INCREMENT=1 ;
++
++-- 
++-- Volcar la base de datos para la tabla `cache_dir`
++-- 
++
++
++-- --------------------------------------------------------
++
++-- 
++-- Structure for table `cache_peer`
++-- 
++
++CREATE TABLE cache_peer (
++  id int(10) unsigned NOT NULL auto_increment,
++  address varchar(255) default NULL,
++  http_port smallint(5) unsigned NOT NULL default '3128',
++  icp_port smallint(5) unsigned NOT NULL default '3130',
++  PRIMARY KEY  (id)
++) AUTO_INCREMENT=1 ;
++
++-- 
++-- Volcar la base de datos para la tabla `cache_peer`
++-- 
++
++
++-- --------------------------------------------------------
++
++-- 
++-- Structure for table `delay_access`
++-- 
++
++CREATE TABLE delay_access (
++  ord tinyint(3) unsigned default NULL,
++  ad char(1) default NULL,
++  aclname varchar(20) default NULL,
++  delay_pool_id int(10) unsigned default NULL
++) TYPE=MyISAM;
++
++-- 
++-- Volcar la base de datos para la tabla `delay_access`
++-- 
++
++
++-- --------------------------------------------------------
++
++-- 
++-- Structure for table `delay_pool`
++-- 
++
++CREATE TABLE delay_pool (
++  id int(10) unsigned NOT NULL auto_increment,
++  class tinyint(3) unsigned default NULL,
++  parameters varchar(255) default NULL,
++  PRIMARY KEY  (id)
++) AUTO_INCREMENT=1 ;
++
++-- 
++-- Volcar la base de datos para la tabla `delay_pool`
++-- 
++
++
++-- --------------------------------------------------------
++
++-- 
++-- Structure for table `general`
++-- 
++
++CREATE TABLE general (
++  id int(11) NOT NULL default '1',
++  enable tinyint(1) NOT NULL default '0',
++  changed tinyint(1) NOT NULL default '0',
++  http_port smallint(5) unsigned NOT NULL default '3128',
++  icp_port smallint(5) unsigned NOT NULL default '3130',
++  visible_hostname varchar(255) default NULL,
++  append_domain varchar(255) default NULL,
++  cache_mem varchar(20) NOT NULL default '8M',
++  PRIMARY KEY  (id)
++) TYPE=MyISAM;
++
++-- 
++-- Volcar la base de datos para la tabla `general`
++-- 
++
++INSERT INTO general VALUES (1, 0, 0, 3128, 3130, NULL, NULL, '8M');
+
+
+

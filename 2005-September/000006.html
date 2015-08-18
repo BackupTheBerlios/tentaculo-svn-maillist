@@ -1,0 +1,85 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Tentaculo-svn] r8 - trunk/misc
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/tentaculo-svn/2005-September/index.html" >
+   <LINK REL="made" HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r8%20-%20trunk/misc&In-Reply-To=%3C200509191516.j8JFGXPO026795%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000005.html">
+   <LINK REL="Next"  HREF="000007.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Tentaculo-svn] r8 - trunk/misc</H1>
+    <B>Diego Andr&#233;s Asenjo Gonz&#225;lez at BerliOS</B> 
+    <A HREF="mailto:tentaculo-svn%40lists.berlios.de?Subject=Re%3A%20%5BTentaculo-svn%5D%20r8%20-%20trunk/misc&In-Reply-To=%3C200509191516.j8JFGXPO026795%40sheep.berlios.de%3E"
+       TITLE="[Tentaculo-svn] r8 - trunk/misc">dasenjo at berlios.de
+       </A><BR>
+    <I>Mon Sep 19 17:16:33 CEST 2005</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000005.html">[Tentaculo-svn] r7 - in trunk: . lib templates/es
+</A></li>
+        <LI>Next message: <A HREF="000007.html">[Tentaculo-svn] r9 - trunk/lib
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#6">[ date ]</a>
+              <a href="thread.html#6">[ thread ]</a>
+              <a href="subject.html#6">[ subject ]</a>
+              <a href="author.html#6">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: dasenjo
+Date: 2005-09-19 17:16:32 +0200 (Mon, 19 Sep 2005)
+New Revision: 8
+
+Modified:
+   trunk/misc/apache.conf
+Log:
+Now there are two executable scripts: index.pl for normal operation, and sec.pl to execute commands that need root privileges.
+
+
+Modified: trunk/misc/apache.conf
+===================================================================
+--- trunk/misc/apache.conf	2005-09-15 08:47:23 UTC (rev 7)
++++ trunk/misc/apache.conf	2005-09-19 15:16:32 UTC (rev 8)
+@@ -14,7 +14,7 @@
+     Allow from All
+ &lt;/Location&gt;
+ 
+-&lt;Location /tentaculo/index.pl&gt;
++&lt;Location ~ &quot;/tentaculo/(index|sec).pl&quot;&gt;
+     Allow from All
+     SetHandler perl-script
+     PerlHandler Apache::Registry
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000005.html">[Tentaculo-svn] r7 - in trunk: . lib templates/es
+</A></li>
+	<LI>Next message: <A HREF="000007.html">[Tentaculo-svn] r9 - trunk/lib
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#6">[ date ]</a>
+              <a href="thread.html#6">[ thread ]</a>
+              <a href="subject.html#6">[ subject ]</a>
+              <a href="author.html#6">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/tentaculo-svn">More information about the Tentaculo-svn
+mailing list</a><br>
+</body></html>
